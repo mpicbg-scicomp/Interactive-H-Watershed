@@ -157,7 +157,17 @@ public class Tree {
 		Integer id;
 		Node parent;
 		List<Node> children;
+		boolean flag= false;
+		float decoration=0;
 		
+		public float getDecoration() {
+			return decoration;
+		}
+
+		public void setDecoration(float decoration) {
+			this.decoration = decoration;
+		}
+
 		public Node(int id)
 		{
 			this.id = id;
@@ -173,6 +183,14 @@ public class Tree {
 			this.parent = parent;
 		}
 		
+		public boolean getFlag() {
+			return flag;
+		}
+
+		public void setFlag(boolean flag) {
+			this.flag = flag;
+		}
+
 		public Integer getId() {
 			return id;
 		}

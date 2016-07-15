@@ -545,15 +545,15 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 	{
 		// image to flood
 		new ij.ImageJ();
-		IJ.open("F:\\projects\\blobs.tif");
+		IJ.open("F:\\projects\\noise500.tif");
 		//IJ.open("F:\\projects\\1D_3peaks.tif");
 		ImagePlus imp = IJ.getImage();
-		IJ.run(imp, "Gaussian Blur...", "sigma=2");
+		//IJ.run(imp, "Gaussian Blur...", "sigma=2");
 		ImagePlusImgConverter impImgConverter = new ImagePlusImgConverter(imp);
 		Img<FloatType> input = impImgConverter.getImgFloatType();
 		
 		float threshold = Float.NEGATIVE_INFINITY;
-		MaxTreeConstruction<FloatType> maxTreeConstructor = new MaxTreeConstruction<FloatType>(input, threshold, Connectivity.FACE);
+		MaxTreeConstruction<FloatType> maxTreeConstructor = new MaxTreeConstruction<FloatType>(input, threshold, Connectivity.FULL);
 		
 		Img<FloatType> output = maxTreeConstructor.getLabelMap();
 		ImagePlus imp_out = impImgConverter.getImagePlus(output);
