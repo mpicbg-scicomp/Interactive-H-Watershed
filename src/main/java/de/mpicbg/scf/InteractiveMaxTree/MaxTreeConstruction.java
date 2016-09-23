@@ -14,8 +14,15 @@ import de.mpicbg.scf.imgtools.image.neighborhood.ImageConnectivity;
 import net.imglib2.Cursor;
 import net.imglib2.FinalInterval;
 import net.imglib2.RandomAccess;
+import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.algorithm.stats.ComputeMinMax;
+import net.imglib2.exception.IncompatibleTypeException;
 import net.imglib2.img.Img;
+import net.imglib2.img.ImgFactory;
+import net.imglib2.roi.labeling.ImgLabeling;
+import net.imglib2.roi.labeling.LabelRegions;
+import net.imglib2.roi.labeling.LabelingMapping;
+import net.imglib2.roi.labeling.LabelingType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
@@ -114,7 +121,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 	//private float[] Imax; // to be initialized at 0
 	//private int[] parent; // to be initialized at minus one (rk it could contain Icriteria which is needed only before parent definition)
 	//private int[][] children;
-	private Img<T> labelMap_treeNodes;
+	private Img<IntType> labelMapMaxTree;
 	private float threshold;
 	private Connectivity connectivity;
 	private boolean maxTreeIsBuilt=false;
@@ -125,7 +132,29 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 	
 	public MaxTreeConstruction(Img<T> input, float threshold, Connectivity connectivity)
 	{
-		this.labelMap_treeNodes = input.copy();
+		int nDims = input.numDimensions();
+		long[] dims = new long[nDims];
+		input.dimensions(dims);
+		ImgFactory<IntType> imgFactoryIntType=null;
+		try {
+			imgFactoryIntType = input.factory().imgFactory( new IntType() );
+		} catch (IncompatibleTypeException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		if ( imgFactoryIntType != null )
+		{
+			this.labelMapMaxTree = imgFactoryIntType.create(dims, new IntType(0));
+			Cursor<IntType> c_label = labelMapMaxTree.cursor();
+			Cursor<T>       c_input = input.cursor();
+			while( c_input.hasNext() )
+			{
+				c_label.next().setInteger( (int) c_input.next().getRealFloat() );
+			}
+		}
+		
+		//this.labelMapmaxTree = input.copy();
 		this.threshold = threshold;
 		this.connectivity = connectivity;
 	}
@@ -144,9 +173,9 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		return parent;
 	}*/
 
-	public Img<T> getLabelMap() {
+	public Img<IntType> getLabelMapMaxTree() {
 		createMaxTree();
-		return labelMap_treeNodes;
+		return labelMapMaxTree;
 	}
 
 
@@ -158,15 +187,15 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		if ( maxTreeIsBuilt )
 			return;
 		
-		T Tmin = labelMap_treeNodes.randomAccess().get().createVariable();
-		T Tmax = Tmin.createVariable();		
-		ComputeMinMax.computeMinMax(labelMap_treeNodes, Tmin, Tmax);
+		IntType Tmin = labelMapMaxTree.randomAccess().get().createVariable();
+		IntType Tmax = Tmin.createVariable();		
+		ComputeMinMax.computeMinMax(labelMapMaxTree, Tmin, Tmax);
 		float min = Math.max(threshold, Tmin.getRealFloat());
 		float max = Tmax.getRealFloat();
 		
 		// get local maxima
 		LocalMaximaLabeling maxLabeler = new LocalMaximaLabeling();
-		Img<IntType> seed = maxLabeler.LocalMaxima(labelMap_treeNodes,min);	
+		Img<IntType> seed = maxLabeler.LocalMaxima(labelMapMaxTree,min);	
 		IntType TnSeeds = new IntType(0);
 		IntType Tdummy = new IntType(0);
 		ComputeMinMax.computeMinMax(seed, Tdummy, TnSeeds);
@@ -179,14 +208,14 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		// create a priority queue
 		HierarchicalFIFO Q = new HierarchicalFIFO( (int)min, (int)max, (int)(max-min+1));
 		
-		int ndim = labelMap_treeNodes.numDimensions();
-		long[] dimensions = new long[ndim]; labelMap_treeNodes.dimensions(dimensions);
+		int ndim = labelMapMaxTree.numDimensions();
+		long[] dimensions = new long[ndim]; labelMapMaxTree.dimensions(dimensions);
 		
 		// create a flat iterable cursor
 		long[] minInt = new long[ ndim ], maxInt = new long[ ndim ];
 		for ( int d = 0; d < ndim; ++d ){   minInt[ d ] = 0 ;    maxInt[ d ] = dimensions[d] - 1 ;  }
 		FinalInterval interval = new FinalInterval( minInt, maxInt );
-		final Cursor< T > input_cursor = Views.flatIterable( Views.interval( labelMap_treeNodes, interval)).cursor();
+		final Cursor< IntType > input_cursor = Views.flatIterable( Views.interval( labelMapMaxTree, interval)).cursor();
 		final Cursor< IntType > seed_cursor = Views.flatIterable( Views.interval( seed, interval)).cursor();
 		
 		double[] hCriteria = new double[2*nLeaves];
@@ -205,7 +234,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		while( input_cursor.hasNext() )
 		{
 			++idx;
-			T pInput = input_cursor.next();
+			IntType pInput = input_cursor.next();
 			float pVal = pInput.getRealFloat();
 			float valSeed = seed_cursor.next().getRealFloat(); 
 			if ( pVal>=min)
@@ -225,10 +254,10 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		
 		
 		// extend input and seeds to to deal with out of bound
-		T outOfBoundT = labelMap_treeNodes.firstElement().createVariable(); 
+		IntType outOfBoundT = labelMapMaxTree.firstElement().createVariable(); 
 		outOfBoundT.setReal(min-1);
-		RandomAccess< T > input_XRA = Views.extendValue(labelMap_treeNodes, outOfBoundT ).randomAccess();
-		RandomAccess< T > input_XRA2 = input_XRA.copyRandomAccess();
+		RandomAccess< IntType > input_XRA = Views.extendValue(labelMapMaxTree, outOfBoundT ).randomAccess();
+		RandomAccess< IntType > input_XRA2 = input_XRA.copyRandomAccess();
 		
 		// define the connectivity
 		long[][] neigh = ImageConnectivity.getConnectivityPos(ndim, connectivity.getConn() );
@@ -237,7 +266,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		int nNeigh = n_offset.length;
 		
 		
-		boolean[] isDequeued = new boolean[(int)labelMap_treeNodes.size()];
+		boolean[] isDequeued = new boolean[(int)labelMapMaxTree.size()];
 		for (int i=0; i<isDequeued.length; i++)
 			isDequeued[i]=false;
 			
@@ -251,7 +280,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 			final long[] posCurrent = new long[ndim];
 			getPosFromIdx((long)pIdx, posCurrent, dimensions);
 			input_XRA.setPosition(posCurrent);
-			T p = input_XRA.get();
+			IntType p = input_XRA.get();
 			int pLabel = (int)(min - 1 - p.getRealFloat());
 			
 			isDequeued[pIdx]=true;
@@ -274,7 +303,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 				final int nIdx = pIdx + n_offset[i];
 				
 				input_XRA2.move(dPosList[i]);
-				final T n = input_XRA2.get();
+				final IntType n = input_XRA2.get();
 				final float nVal = n.getRealFloat();
 				
 				if ( nVal != (min-1) ) // if n is in-bound
@@ -329,14 +358,14 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		}
 		
 		// convert the input to label image (label L is stored in input with value min-1-L all other value should be equal to min-1 )
-		final T minT = labelMap_treeNodes.firstElement().createVariable();
+		final IntType minT = labelMapMaxTree.firstElement().createVariable();
         minT.setReal(min-1);
-        final T minusOneT = labelMap_treeNodes.firstElement().createVariable();
+        final IntType minusOneT = labelMapMaxTree.firstElement().createVariable();
         minusOneT.setReal(-1);
-        Cursor<T> input_cursor2 = labelMap_treeNodes.cursor();
+        Cursor<IntType> input_cursor2 = labelMapMaxTree.cursor();
         while( input_cursor2.hasNext() )
 		{
-        	T p = input_cursor2.next();
+        	IntType p = input_cursor2.next();
         	if (p.getRealFloat()>=(min-1) )
         	{
         		p.setReal(0);
@@ -374,13 +403,13 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 	}
 	
 
-	protected Img<T> relabel_labelMapTreeNodes(Img<T> labelMap_treeNodes, int[] nodeToLabel)
+	protected <U extends RealType<U>> Img<U> relabel_labelMapTreeNodes(Img<U> labelMap0, int[] nodeToLabel)
 	{
-		Img<T> labelMap = labelMap_treeNodes.copy();
-		Cursor<T> cursor = labelMap.cursor();
+		Img<U> labelMap = labelMap0.copy();
+		Cursor<U> cursor = labelMap.cursor();
 		while( cursor.hasNext() )
 		{
-			T pixel = cursor.next();
+			U pixel = cursor.next();
 			float val = (float)nodeToLabel[(int)pixel.getRealFloat()];
 			pixel.setReal( val );	
 		}
@@ -389,140 +418,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 
 	
 	
-/*	
-	protected int[] pruneTree(float hMin)
-	{
-		
-		nodeToLabel = new int[2*nLeaves];
-		for(int node=0; node<nodeToLabel.length; node++)
-			nodeToLabel[node]=0;
-		
-		// find root nodes
-		ArrayList<Integer> roots = new ArrayList<Integer>();
-		for(int node=0; node<nodeToLabel.length; node++)
-			if( parent[node] == node )
-				roots.add(node);
-		
-		// from each root go down the tree
-		// and start a new label if the current node is a leaf
-		// or if all my children do not pass the test
-		for( int node : roots)
-			if( passTest(node) )
-				analyzeNode_MaxRule(node);
-				
-		
-		return nodeToLabel;
-	}
-*/	
-	
-/*	
-	protected void analyzeNode_MaxRule(int node)
-	{
-		if( isLeaf(node) )
-		{
-			nodeToLabel[node]=node;// label
-		}
-		else{
-			int[] c = children[node]; 
-			boolean test0 = passTest(c[0]); 
-			boolean test1 = passTest(c[1]);
-			if( !test0 & !test1 ) // if none of the children pass the test label node and its descendant with value node
-			{
-				nodeToLabel[node]=node;
-				relabelOffsprings(node,node);	
-			}
-			else
-			{
-				if( test0 )
-					analyzeNode_MaxRule(c[0]);
-				if( test1 )
-					analyzeNode_MaxRule(c[1]);
-			}			
-		}	
-	}
-	
-	protected boolean passTest(int node)
-	{
-		if(hCriteria[node]>hMin)
-			return true;
-		return false;
-	}
-	
-	
-	protected boolean isLeaf(int node)
-	{
-		return ( children[node][0]==-1 & children[node][1]==-1 ); 
-	}
-	
-	// assumes node is already labeled
-	protected void relabelOffsprings(int node, int label)
-	{
-		if( !isLeaf(node) )	
-			for( int c : children[node])
-			{
-				nodeToLabel[c]=label;
-				relabelOffsprings(c,label);
-			}
-		return;
-	}
-	
-*/	
-	/*
-	// tree filtering before relabeling
-	protected int[] filterMaxTree_H(float hMin)
-	{	
-		int[] nodeToLabel = new int[2*nLeaves];
-		// initialize each node to inactive
-		for(int node=0; node<nodeToLabel.length; node++)
-			nodeToLabel[node]=-1;
-		
-		for(int node=0; node<=nLeaves; node++)
-		{
-			analyzeNode(node, hMin, nodeToLabel);
-		}
-		
-		for(int node=0; node<nodeToLabel.length; node++)
-			if ( nodeToLabel[node] == -1 )
-					nodeToLabel[node]=0;
-		
-		return nodeToLabel;
-	}
-	
-	
-	
-	protected void analyzeNode(int node, float hMin, int[] nodeToLabel)
-	{
-		if( nodeToLabel[node]<0) // if the node is still active
-		{
-			boolean testResult = hCriteria[node]>hMin;
-			
-			if ( testResult ) // choose the labeling and relabel its descendants
-			{
-				nodeToLabel[node] = node;
-				relabelChildrenNodes(children[node][0], node, nodeToLabel);
-				relabelChildrenNodes(children[node][1], node, nodeToLabel);
-			}
-			else if ( parent[node] != node ) // go up the tree searching for a valid node
-			{
-				analyzeNode( parent[node], hMin, nodeToLabel);
-			}
-		}
-	}
-	
-	
-	protected void relabelChildrenNodes(int node, int newLabel, int[] nodeToLabel)
-	{
-		if (node>=0)
-		{
-			nodeToLabel[node]= newLabel;
-			relabelChildrenNodes(children[node][0],newLabel, nodeToLabel);
-			relabelChildrenNodes(children[node][1],newLabel, nodeToLabel);
-		}
-		return;
-	}
-	*/
-	
-	public Img<T>  getHMaxima(float hMin)
+	public Img<IntType>  getHMaxima(float hMin)
 	{
 		
 		boolean[] nodeSelection = new boolean[maxTree.getNumNodes()];
@@ -533,19 +429,49 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 			
 		TreeLabeling treeLabeler = new TreeLabeling(maxTree);
 		int[] nodeIdToLabel =  treeLabeler.getNodeIdToLabel_LUT(nodeSelection, TreeLabeling.Rule.MAX );
-		Img<T> TreeCutMap = relabel_labelMapTreeNodes(labelMap_treeNodes, nodeIdToLabel);
+		Img<IntType> TreeCutMap = relabel_labelMapTreeNodes(labelMapMaxTree, nodeIdToLabel);
 		
 		return TreeCutMap;
 	}
 	
+	ImgLabeling<Integer, IntType> maxTreeLabeling;
+	LabelingMapping<Integer> labelMapping;
 	
+	public ImgLabeling< Integer , IntType > getImgLabeling()
+	{
+		maxTreeLabeling = new ImgLabeling<Integer, IntType>(labelMapMaxTree);
+		
+		labelMapping  = maxTreeLabeling.getMapping();
+		
+		LabelRegions<Integer> labelRegions = new LabelRegions<Integer>( (RandomAccessibleInterval<LabelingType<Integer>>) labelMapping);
+		
+		
+		/*
+		 * https://github.com/imglib/imglib2-algorithm/blob/master/src/main/java/net/imglib2/algorithm/labeling/ConnectedComponents.java
+		final ArrayList< Set< L > > labelSets = new ArrayList< Set< L > >();
+		labelSets.add( new HashSet< L >() );
+		for ( int i = 1; i < numLabels; ++i )
+		{
+			final HashSet< L > set = new HashSet< L >();
+			set.add( labelGenerator.next() );
+			labelSets.add( set );
+		}
+		new LabelingMapping.SerialisationAccess< L >( labeling.getMapping() )
+		{
+			{
+				super.setLabelSets( labelSets );
+			}
+};
+		*/
+		return maxTreeLabeling;
+	}
 	
 	
 	public static void main(final String... args)
 	{
 		// image to flood
 		new ij.ImageJ();
-		IJ.open("F:\\projects\\noise500.tif");
+		IJ.open("F:\\projects\\blobs.tif");
 		//IJ.open("F:\\projects\\1D_3peaks.tif");
 		ImagePlus imp = IJ.getImage();
 		//IJ.run(imp, "Gaussian Blur...", "sigma=2");
@@ -555,7 +481,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		float threshold = Float.NEGATIVE_INFINITY;
 		MaxTreeConstruction<FloatType> maxTreeConstructor = new MaxTreeConstruction<FloatType>(input, threshold, Connectivity.FULL);
 		
-		Img<FloatType> output = maxTreeConstructor.getLabelMap();
+		Img<IntType> output = maxTreeConstructor.getLabelMapMaxTree();
 		ImagePlus imp_out = impImgConverter.getImagePlus(output);
 		imp_out.show();
 		
@@ -568,13 +494,14 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		System.out.println("Attributes: " + Arrays.toString(attributes));
 		
 		
+		maxTreeConstructor.getImgLabeling();
 		
 		float[] attributes2 = new float[] {1, 2, 4, 8, 16, 32};//Arrays.copyOf(attributes, attributes.length);
 		//Arrays.sort(attributes2);
 		for( float val : attributes2 )
 		{
 			float h= val+1;
-			Img<FloatType> hMax = maxTreeConstructor.getHMaxima(h);
+			Img<IntType> hMax = maxTreeConstructor.getHMaxima(h);
 			ImagePlus imp_hMax = impImgConverter.getImagePlus(hMax);
 			imp_hMax.setTitle("hMax (h="+h+")");
 			imp_hMax.show();

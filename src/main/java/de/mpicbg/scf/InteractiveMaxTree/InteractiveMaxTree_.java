@@ -15,6 +15,7 @@ import net.imagej.display.ImageDisplayService;
 import net.imagej.ops.OpService;
 import net.imglib2.img.Img;
 import net.imglib2.type.numeric.RealType;
+import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imagej.display.ColorTables;
 
@@ -116,8 +117,8 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 	@Override
 	public void preview(){
 		
-		Img<FloatType> treeCut = maxTreeConstructor.getHMaxima(threshold);
-		ImgPlus<FloatType> treeCutPlus = new ImgPlus<FloatType>( treeCut );
+		Img<IntType> treeCut = maxTreeConstructor.getHMaxima(threshold);
+		ImgPlus<IntType> treeCutPlus = new ImgPlus<IntType>( treeCut );
 		
 		DatasetView dView  = (DatasetView) imageDisplay.get(0); // get view in the display
 		dView.getData().setImgPlus( treeCutPlus ); // update image in the view
@@ -151,7 +152,7 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 		
 		// Launch the command .
 		//IJ.openImage("http://imagej.nih.gov/ij/images/blobs.gif").show();
-		Dataset dataset = (Dataset) ij.io().open("F:\\projects\\noise2000_blur2.tif");
+		Dataset dataset = (Dataset) ij.io().open("F:\\projects\\blobs.tif");//noise2000_blur2.tif");
 		
 		ij.ui().show(dataset);
 		
