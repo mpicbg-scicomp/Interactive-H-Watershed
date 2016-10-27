@@ -115,14 +115,42 @@ public class TreeLabeling {
 		
 		for( Node node : tree.getRoots() )
 		{
-			Q_toExplore.add(node);
+			if (node.getFlag())
+				Q_toExplore.add(node);
 		}
 		
 		// find the node to label
 		while( ! Q_toExplore.isEmpty() )
 		{
 			final Node node = Q_toExplore.poll();
+			
+			
+			
+			
 			List<Node> children = node.getChildren();
+			
+			if ( children.size()==0 )
+			{
+				Q_toLabel.add(node);
+				continue;
+			}
+			
+			boolean allChildMeetCriteria=true;
+			for( Node child : children)
+			{
+				if ( !child.getFlag() )
+				{
+					allChildMeetCriteria=false;
+					Q_toLabel.add(node);
+					break;
+				}
+			}
+			
+			if( allChildMeetCriteria )
+				for( Node child : children)
+					Q_toExplore.add(child);
+			
+			/*
 			boolean noChildMeetCriteria = true;
 			for( Node child : children)
 			{
@@ -130,12 +158,13 @@ public class TreeLabeling {
 				{	
 					Q_toExplore.add(child);
 					noChildMeetCriteria = false;
+					
 				}
 			}
 			if( noChildMeetCriteria ) // 1st node for whom no descendant meets the criteria will be labeled (as well as all his descendant)
 			{
 				Q_toLabel.add(node);
-			}
+			}*/
 		}
 		
 		// label the element of Q_toLabel and their offsprings.  
