@@ -1,18 +1,15 @@
 package de.mpicbg.scf.InteractiveMaxTree;
 
-import java.awt.Panel;
-import java.awt.Scrollbar;
-import java.awt.event.AdjustmentEvent;
-import java.awt.event.AdjustmentListener;
+
 import java.io.File;
 import java.util.Arrays;
 
 import ij.IJ;
+import ij.ImageListener;
 import ij.ImagePlus;
-import ij.gui.ImageCanvas;
 import ij.gui.ImageRoi;
-import ij.gui.ImageWindow;
 import ij.gui.Overlay;
+import ij.gui.YesNoCancelDialog;
 import ij.plugin.Duplicator;
 import ij.plugin.ImageCalculator;
 import ij.plugin.LutLoader;
@@ -34,6 +31,7 @@ import org.scijava.command.Command;
 import org.scijava.command.Previewable;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
+import org.scijava.widget.Button;
 import org.scijava.widget.ChoiceWidget;
 import org.scijava.widget.NumberWidget;
 import org.scijava.module.MutableModuleItem;
@@ -44,21 +42,26 @@ import de.mpicbg.scf.InteractiveMaxTree.MaxTreeConstruction.Connectivity;
 /**
  * An ImageJ2 command using the MaxTree Construction class
  * 
- * TODO:
- *	- allow to export the labelmap (button, question when closing the plugin )
- *	- allow to make intensity slider logarithmics or not
- *	- Multithread image labeling (to keep some interactivity with very large plane)
- *		+ Remark: what is the bottleneck? tree labeling or image labeling
- *	- make sure only the necessayr processing is done at each preview() method call
- *  - clean the code
- *  - allow user to switch between between xy, xz and yz view of the segmentation
+ * Bug:
+ * 	- using the B&C sometimes results in switching the image processor diaplayed (?)
  *  
+ * TODO:
+ *  - On image close or on plugin close message to confirm ending of the process (plus warn that non exported data will be lost)
+ * 	- relabel the exported image (to get a more intuitive labeling)
+ *	
  * Development ideas:
- *  - Given all the possible segment in the space (seed dynamics, flooding level) would it be possible to select the segments 
+ *  - make sure only the necessary processing is done at each preview() method call
+ *  - clean the code
+ *  - allow to make intensity slider logarithmics or not
+ *	- allow user to switch between between xy, xz and yz view of the segmentation
+ *  - Multithread image labeling (to keep some interactivity with very large plane)
+ *		+ Remark: what is the bottleneck? tree labeling or image labeling
+ *	- Given all the possible segment in the space (seed dynamics, flooding level) would it be possible to select the segments 
  *    with the best shapes given a simple shape model (feature vector on each regions) 
  *  - Let user select some good/bad segment to create a shape model
  *  - Let user correct some bad segmentation to create an improved merging criteria
- *  	
+ *  - perform Watershed and segment merging separately in the max tree construction	to allow using the best of both algorithm
+ *    and also to allow merging on different criteria than peak dynamics.
  * 
  */
 @Plugin(type = Command.class, menuPath = "SCF>test IJ2 command>MaxTree", initializer="initMaxTree", headless = true, label="Interactive watershed")
@@ -76,29 +79,26 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 	private Float intensity_threshold;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="peak flooding (in %)", min="0", max="100")
-	private Float peak_floodingPercentage=(float) 100;
+	private Float peak_floodingPercentage;
 	
 	@Parameter(style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "Image", "Contour overlay", "Solid overlay" } )
 	private String displayStyle;
 	
-	//@Parameter
-	//private ImageDisplayService imageDisplayService;
+	@Parameter(label = "export", callback="exportButton_callback" )
+	private Button testButton;
 	
 	@Parameter
 	private OpService ops;
 	
-	@Parameter
-	private DatasetService datasetService;
 	
 	
 	// -- Other fields --
-	float minI;
-	float maxI;
+	float minI, maxI;
 	MaxTreeConstruction<FloatType> maxTreeConstructor;
 	
 	// init interface previous status
 	
-	int zSlice_Old = -1;
+	int zSlice_Old = 1;
 	Float seed_threshold_Old = 0f;
 	Float intensity_threshold_Old = 0f;
 	Float peak_floodingPercentage_Old = 100f;
@@ -112,16 +112,14 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 	
 	int nLabel;
 	ImagePlus impSegmentationDisplay;
-	ImagePlus input_imp; // wrapper of the input dataset for displaying results
+	ImagePlus input_imp; // copy of the input dataset for displaying results
 	ImagePlus imp_curSeg;
 	
 	
 	// -- Command methods --
 
 	@Override
-	public void run() {
-		//IJ.run(imp, "Convert to Mask", "");
-	}
+	public void run() {    }
 
 
 	// -- Initializer methods --
@@ -131,7 +129,6 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 		{
 			return;
 		}
-		//Img<T> input0 = (Img<T>) dataset.getImgPlus();
 		
 		Img<FloatType> input = ops.convert().float32( (ImgPlus<T>) dataset.getImgPlus() );
 		//input_imp =  ImageJFunctions.wrapFloat(input, "test");
@@ -164,7 +161,7 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 		thresholdItem2.setStepSize( 0.05);
 		
 		final MutableModuleItem<Float> thresholdItem3 = getInfo().getMutableInput("peak_floodingPercentage", Float.class);
-		thresholdItem3.setDefaultValue(100f);
+		thresholdItem3.setValue(this, 100f);
 		
 		nLabel =  maxTreeConstructor.getTree().getNumNodes();
 		
@@ -180,33 +177,53 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 			impSegmentationDisplay = IJ.createImage("interactive watershed", (int)dimensions[0], (int)dimensions[1], (int)dimensions[2], 32);
 		
 		impSegmentationDisplay.show();
-		ImageWindow window_segmentation = impSegmentationDisplay.getWindow();
 		
 		is3D = nDims>2?true:false;
 		
 		if (is3D )
 		{
-			Scrollbar scrollBar = ( Scrollbar )( ( Panel )window_segmentation.getComponent( 1 ) ).getComponent( 1 );
-		
-			zSlice = scrollBar.getValue();
-			scrollBar.addAdjustmentListener( new AdjustmentListener()
-						{
-							@Override
-							public void adjustmentValueChanged(AdjustmentEvent e) {
-								zSlice = e.getValue();
+			ImagePlus.addImageListener( new ImageListener(){
 								
-								//System.out.println("z = " + zSlice);
-								// trigger update of the segmentation
-								preview();
-							}
+								@Override
+								public void imageClosed(ImagePlus imp) {
+									System.out.println("image "+imp.getTitle()+" was closed");
+								}
+				
+								@Override
+								public void imageOpened(ImagePlus imp) {
+									System.out.println("image "+imp.getTitle()+" was opened");	
+								}
+				
+								@Override
+								public void imageUpdated(ImagePlus imp) {
+									ImagePlus.removeImageListener(this);
+									
+									System.out.println("image "+imp.getTitle()+" was updated");
+									if ( imp==impSegmentationDisplay )
+									{	
+										zSlice = imp.getSlice();
+										System.out.println("seg display: zSlice="+zSlice+" ; zSlice_Old="+zSlice_Old);
+										if (zSlice != zSlice_Old )
+										{	
+											preview();
+										}
+									}
+									
+									ImagePlus.addImageListener(this);
+										
+										
+								}
+				
 						});
+			
+			
+			
 		}
 	}
 	
 	
 	@Override
 	public void preview(){
-		
 		
 		
 		LUT segmentationLUT;
@@ -247,11 +264,7 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 		
 		ImageProcessor input_ip;
 		if(is3D)
-		{
 			input_ip = input_imp.getStack().getProcessor(zSlice);
-			//input_imp.show();
-			//System.out.println("3D: z=" + zSlice);
-		}
 		else
 			input_ip = input_imp.getProcessor();
 		
@@ -287,14 +300,12 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 			imageRoi.setPosition(zSlice);
 			overlay.add(imageRoi);
 
-			
 			impSegmentationDisplay.setProcessor( input_ip );
 			impSegmentationDisplay.setDisplayRange(input_displayRange[0], input_displayRange[1]);
 
 		}
 		else
 		{
-			//impSegmentationDisplay.getStack().setProcessor(ip_curSeg, zSlice);
 			impSegmentationDisplay.setProcessor( ip_curSeg );
 			impSegmentationDisplay.setDisplayRange( segmentation_displayRange[0], segmentation_displayRange[1]);
 		}
@@ -315,13 +326,28 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 	
 	@Override
 	public void cancel(){
-		if (dataset == null)
-		{
-			return;
-		}
-		// create the full label map and display it
+		// this function in never called in interactive command
 		
 	}
+	
+	
+	protected void exportButton_callback(){
+		System.out.println("Export button click");
+		
+		float T  =(float)Math.exp(intensity_threshold)+minI-1;
+		float h = (float)Math.exp(seed_threshold)+minI-1;
+		float perc = peak_floodingPercentage; 
+		Img<IntType> export_img = maxTreeConstructor.getHFlooding2(	h, T, perc);
+		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, dataset.getName() + " - watershed (h="+h+",T="+T+",%="+perc+")" );
+		
+		LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
+		exported_imp.setLut(segmentationLUT);
+		exported_imp.show();
+		
+		
+	}
+	
+	
 	
 	
 	public static <T extends RealType<T>> void main(final String... args) throws Exception {
@@ -338,6 +364,8 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 		ij.ui().show(dataset);
 		
 		ij.command().run(InteractiveMaxTree_.class, true);
+		
+		
 	}
 
 
