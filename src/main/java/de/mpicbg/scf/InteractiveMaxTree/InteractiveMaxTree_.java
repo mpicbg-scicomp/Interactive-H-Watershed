@@ -64,7 +64,7 @@ import de.mpicbg.scf.InteractiveMaxTree.MaxTreeConstruction.Connectivity;
  *    and also to allow merging on different criteria than peak dynamics.
  * 
  */
-@Plugin(type = Command.class, menuPath = "SCF>test IJ2 command>MaxTree", initializer="initMaxTree", headless = true, label="Interactive watershed")
+@Plugin(type = Command.class, menuPath = "SCF>test IJ2 command>Interactive Watershed", initializer="initMaxTree", headless = true, label="Interactive watershed")
 //public class InteractiveMaxTree_<T extends RealType<T> > extends DynamicCommand implements Previewable  {
 public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImageCommand implements Previewable  {
 
