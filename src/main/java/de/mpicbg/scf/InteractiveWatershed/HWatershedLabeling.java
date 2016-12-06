@@ -47,7 +47,7 @@ import net.imglib2.view.Views;
  */
 
 
-public class HWatershedLabelling<T extends RealType<T>> {
+public class HWatershedLabeling<T extends RealType<T>> {
 	// Build max tree based on IFT watershed approach
 	//
 	// max tree is hierarchy of image peaks based on their dynamics
@@ -146,7 +146,7 @@ public class HWatershedLabelling<T extends RealType<T>> {
 	
 	
 	
-	public HWatershedLabelling(Img<T> input, float threshold, Connectivity connectivity)
+	public HWatershedLabeling(Img<T> input, float threshold, Connectivity connectivity)
 	{
 		int nDims = input.numDimensions();
 		long[] dims = new long[nDims];
@@ -942,7 +942,7 @@ public class HWatershedLabelling<T extends RealType<T>> {
 		Img<FloatType> input = impImgConverter.getImgFloatType();
 		
 		float threshold = Float.NEGATIVE_INFINITY;
-		HWatershedLabelling<FloatType> maxTreeConstructor = new HWatershedLabelling<FloatType>(input, threshold, Connectivity.FULL);
+		HWatershedLabeling<FloatType> maxTreeConstructor = new HWatershedLabeling<FloatType>(input, threshold, Connectivity.FULL);
 		
 		Img<IntType> output = maxTreeConstructor.getLabelMapMaxTree();
 		ImagePlus imp_out = impImgConverter.getImagePlus(output);

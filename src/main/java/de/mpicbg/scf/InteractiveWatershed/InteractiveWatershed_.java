@@ -35,7 +35,7 @@ import org.scijava.widget.NumberWidget;
 import org.scijava.module.MutableModuleItem;
 import org.scijava.ItemIO;
 
-import de.mpicbg.scf.InteractiveWatershed.HWatershedLabelling.Connectivity;
+import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
 /**
  * An ImageJ2 command using the MaxTree Construction class
@@ -97,7 +97,7 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 	
 	// -- Other fields --
 	float minI, maxI;
-	HWatershedLabelling<FloatType> maxTreeConstructor;
+	HWatershedLabeling<FloatType> maxTreeConstructor;
 	
 	// init interface previous status
 	
@@ -145,7 +145,7 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 		float threshold = Float.NEGATIVE_INFINITY;
 		
 		
-		maxTreeConstructor = new HWatershedLabelling<FloatType>(input, threshold, Connectivity.FACE);
+		maxTreeConstructor = new HWatershedLabeling<FloatType>(input, threshold, Connectivity.FACE);
 		
 		double[] dynamics = maxTreeConstructor.getTree().getFeature("dynamics");
 		maxI = (float) Arrays.stream(dynamics).max().getAsDouble();
