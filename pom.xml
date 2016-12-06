@@ -12,10 +12,10 @@
 	</parent>
 
 	<groupId>de.mpicbg</groupId>
-	<artifactId>InteractiveMaxTree</artifactId>
-	<version>0.1.0</version>
+	<artifactId>InteractiveWatershed</artifactId>
+	<version>1.0.0</version>
 
-	<name>InteractiveMaxTree.jar</name>
+	<name>InteractiveWatershed.jar</name>
 	
 	<description></description>
 
@@ -69,13 +69,7 @@
 		<developer>
 			<id>developer_id</id>
 			<name> Benoit Lombardot </name>
-			<email>XXX@XXX</email>
-			<url>http://XXX</url>
 			<organization>Scientific Computing facility MPI-CBG</organization>
-			<organizationUrl>http://XXX</organizationUrl>
-			<roles>
-				<role>developer</role>
-			</roles>
 			<timezone>+1</timezone>
 		</developer>
 	</developers>

@@ -1,33 +1,28 @@
-package de.mpicbg.scf.InteractiveMaxTree;
+package de.mpicbg.scf.InteractiveWatershed;
 
 
 import java.util.Arrays;
 import java.util.Map;
 
-import net.imglib2.view.IntervalView;
+
+
 import ij.IJ;
 import ij.ImagePlus;
-import de.mpicbg.scf.InteractiveMaxTree.HierarchicalFIFO;
-import de.mpicbg.scf.InteractiveMaxTree.Tree;
-import de.mpicbg.scf.InteractiveMaxTree.Tree.Node;
-import de.mpicbg.scf.InteractiveMaxTree.TreeLabeling;
+import de.mpicbg.scf.InteractiveWatershed.HierarchicalFIFO;
+import de.mpicbg.scf.InteractiveWatershed.Tree;
+import de.mpicbg.scf.InteractiveWatershed.TreeLabeling;
+import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
 import de.mpicbg.scf.imgtools.image.create.image.ImagePlusImgConverter;
 import de.mpicbg.scf.imgtools.image.create.labelmap.LocalMaximaLabeling;
 import de.mpicbg.scf.imgtools.image.neighborhood.ImageConnectivity;
 import net.imglib2.Cursor;
 import net.imglib2.FinalInterval;
-import net.imglib2.Interval;
 import net.imglib2.IterableInterval;
 import net.imglib2.RandomAccess;
-import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.algorithm.stats.ComputeMinMax;
 import net.imglib2.exception.IncompatibleTypeException;
 import net.imglib2.img.Img;
 import net.imglib2.img.ImgFactory;
-import net.imglib2.roi.labeling.ImgLabeling;
-import net.imglib2.roi.labeling.LabelRegions;
-import net.imglib2.roi.labeling.LabelingMapping;
-import net.imglib2.roi.labeling.LabelingType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
@@ -42,9 +37,17 @@ import net.imglib2.view.Views;
  * Remark: the input image is duplicated and will not be modified during the process 
  * Remark: the input type should be able to represent the number of nodes of the tree number (2 time the number of maxima in input minus one) 
  * 
+ * todo:
+ *  - clean the class, check usability of getter, setter, constructor, move the plugin specific part to the plugin
+ *  - check for the possibility to build a tree from seeds and list the required change (for instance to ensure Imin, Imax, and dynamics are properly calculated)
+ *  - explore the possibility to separate watershed and segment hierarchy (to gain speed with the watershed and flexibility for hierarcgy construction)
+ *  - Multithread tree and image relabeling (to keep some interactivity with very large plane)
+ *		+ Remark: what is the bottleneck? tree labeling or image labeling, something else?
  * @param <T>
  */
-public class MaxTreeConstruction<T extends RealType<T>> {
+
+
+public class HWatershedLabelling<T extends RealType<T>> {
 	// Build max tree based on IFT watershed approach
 	//
 	// max tree is hierarchy of image peaks based on their dynamics
@@ -143,7 +146,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 	
 	
 	
-	public MaxTreeConstruction(Img<T> input, float threshold, Connectivity connectivity)
+	public HWatershedLabelling(Img<T> input, float threshold, Connectivity connectivity)
 	{
 		int nDims = input.numDimensions();
 		long[] dims = new long[nDims];
@@ -811,7 +814,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 	}
 	
 
-	public Img<IntType>  getHFlooding2(float hMin, float globalThreshold, float peakFloodingPercent)
+	public Img<IntType>  getHFlooding(float hMin, float globalThreshold, float peakFloodingPercent)
 	{
 		int[] nodeIdToLabel = getTreeLabeling( hMin );
 		
@@ -821,7 +824,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 	}
 	
 
-	public Img<IntType>  getHFlooding2(float hMin, float globalThreshold, float peakFloodingPercent, int Z)
+	public Img<IntType>  getHFlooding(float hMin, float globalThreshold, float peakFloodingPercent, int Z)
 	{
 		int nDims = labelMapMaxTree.numDimensions();
 			
@@ -878,8 +881,6 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 	}
 	
 	
-	
-	
 	public <U extends RealType<U>> Img<U> createLabelMap_forTheTreeLabeling(Img<U> labelMap, IterableInterval<T> inputIntensity, int[] nodeToLabel, float globalThreshold, float peakFloodingPercent)
 	{
 		
@@ -925,114 +926,9 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 	
 	
 	
-	/*
-	ImgLabeling<Integer, IntType> maxTreeLabeling;
-	LabelingMapping<Integer> labelMapping;
-	
-	public ImgLabeling< Integer , IntType > getImgLabeling()
-	{
-		maxTreeLabeling = new ImgLabeling<Integer, IntType>(labelMapMaxTree);
-		
-		labelMapping  = maxTreeLabeling.getMapping();
-		
-		LabelRegions<Integer> labelRegions = new LabelRegions<Integer>( (RandomAccessibleInterval<LabelingType<Integer>>) labelMapping);
-		
-		
-		/*
-		 * https://github.com/imglib/imglib2-algorithm/blob/master/src/main/java/net/imglib2/algorithm/labeling/ConnectedComponents.java
-		final ArrayList< Set< L > > labelSets = new ArrayList< Set< L > >();
-		labelSets.add( new HashSet< L >() );
-		for ( int i = 1; i < numLabels; ++i )
-		{
-			final HashSet< L > set = new HashSet< L >();
-			set.add( labelGenerator.next() );
-			labelSets.add( set );
-		}
-		new LabelingMapping.SerialisationAccess< L >( labeling.getMapping() )
-		{
-			{
-				super.setLabelSets( labelSets );
-			}
-};
-		*/
-	//	return maxTreeLabeling;
-	//}
-	
-	/*
-	public Img<IntType>  getHMaxima(float hMin)
-	{
-		createMaxTree2();
-		
-		boolean[] nodeSelection = new boolean[maxTree.getNumNodes()];
-		double[] feature = maxTree.getFeature("dynamics");
-		
-		for( int nodeId=0; nodeId<maxTree.getNumNodes(); nodeId++ )
-			nodeSelection[nodeId] = feature[nodeId]>hMin; 
-			
-		TreeLabeling treeLabeler = new TreeLabeling(maxTree);
-		int[] nodeIdToLabel =  treeLabeler.getNodeIdToLabel_LUT(nodeSelection, TreeLabeling.Rule.MAX );
-		Img<IntType> TreeCutMap = relabel_labelMapTreeNodes(labelMapMaxTree, nodeIdToLabel);
-		
-		return TreeCutMap;
-	}
 	
 	
-	
-	public Img<IntType>  getHFlooding(float hMin, float threshold)
-	{
-		createMaxTree2();
-		
-		boolean[] nodeSelection = new boolean[maxTree.getNumNodes()];
-		double[] dynamics = maxTree.getFeature("dynamics");
-		double[] Imax = maxTree.getFeature("Imax");
-		
-		for( int nodeId=0; nodeId<maxTree.getNumNodes(); nodeId++ )
-			nodeSelection[nodeId] = (dynamics[nodeId]>hMin);
-		
-		TreeLabeling treeLabeler = new TreeLabeling(maxTree);
-		int[] nodeIdToLabel =  treeLabeler.getNodeIdToLabel_LUT(nodeSelection, TreeLabeling.Rule.MAX );
-		
-		Img<IntType> TreeCutMap = relabel_labelMapTreeNodes(labelMapMaxTree, nodeIdToLabel, threshold);
-		
-		return TreeCutMap;
-	}
-	
-	*/
-	
-	/*
-	protected <U extends RealType<U>> Img<U> relabel_labelMapTreeNodes(Img<U> labelMap0, int[] nodeToLabel)
-	{
-		Img<U> labelMap = labelMap0.copy();
-		Cursor<U> cursor = labelMap.cursor();
-		while( cursor.hasNext() )
-		{
-			U pixel = cursor.next();
-			float val = (float)nodeToLabel[(int)pixel.getRealFloat()];
-			pixel.setReal( val );	
-		}
-		return labelMap;
-	}
 
-	protected <U extends RealType<U>> Img<U> relabel_labelMapTreeNodes(Img<U> labelMap0, int[] nodeToLabel, float threshold)
-	{
-		Img<U> labelMap = labelMap0.copy();
-		Cursor<U> cursor = labelMap.cursor();
-		Cursor<T> cursorImg = input.cursor();
-		while( cursor.hasNext() )
-		{
-			T imgPixel = cursorImg.next();
-			U pixel = cursor.next();
-			if( imgPixel.getRealFloat()>=threshold )
-			{	
-				float val = (float)nodeToLabel[(int)pixel.getRealFloat()];
-				pixel.setReal( val );
-			}
-			else
-				pixel.setReal( 0.0 );
-		}
-		return labelMap;
-	}
-*/	
 	
 	public static void main(final String... args)
 	{
@@ -1046,7 +942,7 @@ public class MaxTreeConstruction<T extends RealType<T>> {
 		Img<FloatType> input = impImgConverter.getImgFloatType();
 		
 		float threshold = Float.NEGATIVE_INFINITY;
-		MaxTreeConstruction<FloatType> maxTreeConstructor = new MaxTreeConstruction<FloatType>(input, threshold, Connectivity.FULL);
+		HWatershedLabelling<FloatType> maxTreeConstructor = new HWatershedLabelling<FloatType>(input, threshold, Connectivity.FULL);
 		
 		Img<IntType> output = maxTreeConstructor.getLabelMapMaxTree();
 		ImagePlus imp_out = impImgConverter.getImagePlus(output);

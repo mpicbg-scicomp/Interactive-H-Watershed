@@ -1,9 +1,9 @@
-package de.mpicbg.scf.InteractiveMaxTree;
+package de.mpicbg.scf.InteractiveWatershed;
 
 import java.util.LinkedList;
 import java.util.List;
 
-import de.mpicbg.scf.InteractiveMaxTree.Tree.Node;
+import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
 
 public class TreeLabeling {
 	

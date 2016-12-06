@@ -1,4 +1,4 @@
-package de.mpicbg.scf.InteractiveMaxTree;
+package de.mpicbg.scf.InteractiveWatershed;
 
 
 import java.util.ArrayList;

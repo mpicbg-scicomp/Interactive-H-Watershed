@@ -1,4 +1,4 @@
-package de.mpicbg.scf.InteractiveMaxTree;
+package de.mpicbg.scf.InteractiveWatershed;
 
 
 import java.io.File;
@@ -9,14 +9,12 @@ import ij.ImageListener;
 import ij.ImagePlus;
 import ij.gui.ImageRoi;
 import ij.gui.Overlay;
-import ij.gui.YesNoCancelDialog;
 import ij.plugin.Duplicator;
 import ij.plugin.ImageCalculator;
 import ij.plugin.LutLoader;
 import ij.process.ImageProcessor;
 import ij.process.LUT;
 import net.imagej.Dataset;
-import net.imagej.DatasetService;
 import net.imagej.ImageJ;
 import net.imagej.ImgPlus;
 import net.imagej.command.InteractiveImageCommand;
@@ -37,13 +35,13 @@ import org.scijava.widget.NumberWidget;
 import org.scijava.module.MutableModuleItem;
 import org.scijava.ItemIO;
 
-import de.mpicbg.scf.InteractiveMaxTree.MaxTreeConstruction.Connectivity;
+import de.mpicbg.scf.InteractiveWatershed.HWatershedLabelling.Connectivity;
 
 /**
  * An ImageJ2 command using the MaxTree Construction class
  * 
- * Bug:
- * 	- using the B&C sometimes results in switching the image processor diaplayed (?)
+ * known issue:
+ * 	- using the B&C sometimes results in switching the image processor displayed (?)
  *  
  * TODO:
  *  - On image close or on plugin close message to confirm ending of the process (plus warn that non exported data will be lost)
@@ -53,20 +51,25 @@ import de.mpicbg.scf.InteractiveMaxTree.MaxTreeConstruction.Connectivity;
  *  - make sure only the necessary processing is done at each preview() method call
  *  - clean the code
  *  - allow to make intensity slider logarithmics or not
- *	- allow user to switch between between xy, xz and yz view of the segmentation
- *  - Multithread image labeling (to keep some interactivity with very large plane)
- *		+ Remark: what is the bottleneck? tree labeling or image labeling
+ *	- allow user to display other views switch between between xy, xz and yz view of the segmentation
+ *		+ avoid need for new viewer infrastructure.
+ *	- faster watershed to limit waiting time
+ *	- identify bottleneck in ui update 
+ *	- rethink the implementation for better readability and maintainability 
+ *
+ *	beyond the current plugin:
  *	- Given all the possible segment in the space (seed dynamics, flooding level) would it be possible to select the segments 
- *    with the best shapes given a simple shape model (feature vector on each regions) 
- *  - Let user select some good/bad segment to create a shape model
+ *    with the best shapes given a simple shape model (feature vector on each regions)
+ *  - probably not possible to explore all segments in the tree x threshold space
+ *  	* build a new tree on the segment intersecting a given binarisation (i.e. segmentation on the dynamics hierarchy) 
+ *  - Let user select some good/bad segment to create a shape/non-shape model
  *  - Let user correct some bad segmentation to create an improved merging criteria
- *  - perform Watershed and segment merging separately in the max tree construction	to allow using the best of both algorithm
- *    and also to allow merging on different criteria than peak dynamics.
+ *  - learn a merging criteria
  * 
  */
-@Plugin(type = Command.class, menuPath = "SCF>test IJ2 command>Interactive Watershed", initializer="initMaxTree", headless = true, label="Interactive watershed")
+@Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive watershed", initializer="initialize_HWatershed", headless = true, label="Interactive watershed")
 //public class InteractiveMaxTree_<T extends RealType<T> > extends DynamicCommand implements Previewable  {
-public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImageCommand implements Previewable  {
+public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveImageCommand implements Previewable  {
 
 	// -- Parameters --
 	@Parameter (type = ItemIO.BOTH)
@@ -94,7 +97,7 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 	
 	// -- Other fields --
 	float minI, maxI;
-	MaxTreeConstruction<FloatType> maxTreeConstructor;
+	HWatershedLabelling<FloatType> maxTreeConstructor;
 	
 	// init interface previous status
 	
@@ -123,7 +126,7 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 
 
 	// -- Initializer methods --
-	protected void initMaxTree() {	
+	protected void initialize_HWatershed() {	
 		
 		if (dataset == null)
 		{
@@ -142,7 +145,7 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 		float threshold = Float.NEGATIVE_INFINITY;
 		
 		
-		maxTreeConstructor = new MaxTreeConstruction<FloatType>(input, threshold, Connectivity.FACE);
+		maxTreeConstructor = new HWatershedLabelling<FloatType>(input, threshold, Connectivity.FACE);
 		
 		double[] dynamics = maxTreeConstructor.getTree().getFeature("dynamics");
 		maxI = (float) Arrays.stream(dynamics).max().getAsDouble();
@@ -251,7 +254,7 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 				| 	intensity_threshold != intensity_threshold_Old
 				|	peak_floodingPercentage != peak_floodingPercentage_Old)
 		{
-			Img<IntType> img_currentSegmentation = maxTreeConstructor.getHFlooding2(	(float)Math.exp(seed_threshold)+minI-1, 
+			Img<IntType> img_currentSegmentation = maxTreeConstructor.getHFlooding(	(float)Math.exp(seed_threshold)+minI-1, 
 																						(float)Math.exp(intensity_threshold)+minI-1, 
 																						peak_floodingPercentage, 
 																						zSlice-1 	);
@@ -337,7 +340,7 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 		float T  =(float)Math.exp(intensity_threshold)+minI-1;
 		float h = (float)Math.exp(seed_threshold)+minI-1;
 		float perc = peak_floodingPercentage; 
-		Img<IntType> export_img = maxTreeConstructor.getHFlooding2(	h, T, perc);
+		Img<IntType> export_img = maxTreeConstructor.getHFlooding(	h, T, perc);
 		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, dataset.getName() + " - watershed (h="+h+",T="+T+",%="+perc+")" );
 		
 		LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
@@ -363,7 +366,7 @@ public class InteractiveMaxTree_<T extends RealType<T> > extends InteractiveImag
 		
 		ij.ui().show(dataset);
 		
-		ij.command().run(InteractiveMaxTree_.class, true);
+		ij.command().run(InteractiveWatershed_.class, true);
 		
 		
 	}
