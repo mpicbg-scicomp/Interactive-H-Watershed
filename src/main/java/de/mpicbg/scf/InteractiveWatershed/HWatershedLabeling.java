@@ -40,7 +40,7 @@ import net.imglib2.view.Views;
  * todo:
  *  - clean the class, check usability of getter, setter, constructor, move the plugin specific part to the plugin
  *  - check for the possibility to build a tree from seeds and list the required change (for instance to ensure Imin, Imax, and dynamics are properly calculated)
- *  - explore the possibility to separate watershed and segment hierarchy (to gain speed with the watershed and flexibility for hierarcgy construction)
+ *  - explore the possibility to separate watershed and segment hierarchy (to gain speed with the watershed and flexibility for hierarchy construction)
  *  - Multithread tree and image relabeling (to keep some interactivity with very large plane)
  *		+ Remark: what is the bottleneck? tree labeling or image labeling, something else?
  * @param <T>
@@ -223,7 +223,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		// debug
 		
 		// create a priority queue
-		HierarchicalFIFO Q = new HierarchicalFIFO( (int)min, (int)max, (int)(max-min+1));
+		HierarchicalFIFO Q = new HierarchicalFIFO( (int)min, (int)max);
 		
 		int ndim = labelMapMaxTree.numDimensions();
 		long[] dimensions = new long[ndim]; labelMapMaxTree.dimensions(dimensions);
@@ -505,7 +505,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		
 		
 		// create a priority queue
-		HierarchicalFIFO Q = new HierarchicalFIFO( (int)min, (int)max, (int)(max-min+1));
+		HierarchicalFIFO Q = new HierarchicalFIFO( (int)min, (int)max);
 		
 		int ndim = labelMapMaxTree.numDimensions();
 		long[] dimensions = new long[ndim]; labelMapMaxTree.dimensions(dimensions);

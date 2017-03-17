@@ -38,7 +38,7 @@ import org.scijava.ItemIO;
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
 /**
- * An ImageJ2 command using the MaxTree Construction class
+ * An ImageJ2 command using the HWatershedLabelling class
  * 
  * known issue:
  * 	- using the B&C sometimes results in switching the image processor displayed (?)

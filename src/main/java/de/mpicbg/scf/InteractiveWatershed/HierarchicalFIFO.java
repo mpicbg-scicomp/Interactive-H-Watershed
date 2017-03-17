@@ -21,8 +21,9 @@ public class HierarchicalFIFO {
 	private ArrayList<LinkedList<Integer>> QueueList; 
 	
 	
-	public HierarchicalFIFO(int min, int max, int nbin)
+	public HierarchicalFIFO(int min, int max)
 	{
+		int nbin = max - min + 1;
 		QueueList = new ArrayList<LinkedList<Integer>>(nbin);
 		for(int i=0; i<nbin; i++)
 			QueueList.add( new LinkedList<Integer>() );
