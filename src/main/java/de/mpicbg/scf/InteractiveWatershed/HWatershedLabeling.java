@@ -10,7 +10,7 @@ import ij.IJ;
 import ij.ImagePlus;
 import de.mpicbg.scf.InteractiveWatershed.HierarchicalFIFO;
 import de.mpicbg.scf.InteractiveWatershed.Tree;
-import de.mpicbg.scf.InteractiveWatershed.TreeLabeling;
+import de.mpicbg.scf.InteractiveWatershed.TreeUtils;
 import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
 import de.mpicbg.scf.imgtools.image.create.image.ImagePlusImgConverter;
 import de.mpicbg.scf.imgtools.image.create.labelmap.LocalMaximaLabeling;
@@ -185,20 +185,13 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		return maxTree;
 	}
 
-	/*public int[] getParents() {
-		createMaxTree();
-		return parent;
-	}*/
-
 	public Img<IntType> getLabelMapMaxTree() {
 		createMaxTree2();
 		return labelMapMaxTree;
 	}
 
 
-	//public Img<IntType> labelMapDebug; // debug only
-
-	
+	@Deprecated
 	protected void createMaxTree()
 	{
 		if ( maxTreeIsBuilt )
@@ -676,19 +669,6 @@ public class HWatershedLabeling<T extends RealType<T>> {
 									else
 										HMerge = Math.min( hCriteria[children[parent[node2]][0]], hCriteria[children[parent[node2]][1]] );
 								}
-								
-								/*
-								int par2 = parent[node2]; 
-								while( (hCriteria[par2] <= H1)  )
-								{	
-									node2 = par2;
-									par2 = parent[node2];
-								
-								}
-								*/
-
-								//while( hCriteria[node2] <= H1 )
-								//	node2 = parent[node2];
 							}
 							mergeNodes(node1, node2, newNode, parent, children);
 							pNode=findRoot(newNode, parent);
@@ -771,7 +751,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			}
 		}
 							
-		// update children of parent(node1) if needed
+		// update children of parent(node2) if needed
 		int par2 = parent[node2];
 		if( par2 != node2){ // node2 is not a root
 			for(int i=0; i<2; i++){
@@ -813,17 +793,37 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		}
 	}
 	
-
+	
+	
+	
+	
+	//  segment hierarchy relabeling functions
+	
+	
+	/**
+	 * Build the Hmaxima flooding of the original image from the its segment hierarchy (on peak dynamics)
+	 * @param hMin hMaxima parameter to determine flooding seeds
+	 * @param globalThreshold Threshold to stop the flooding
+	 * @param peakFloodingPercent fraction of the 
+	 * @return
+	 */
 	public Img<IntType>  getHFlooding(float hMin, float globalThreshold, float peakFloodingPercent)
 	{
-		int[] nodeIdToLabel = getTreeLabeling( hMin );
+		int[] nodeIdToLabel =  TreeUtils.getTreeLabeling(maxTree, "dynamics", hMin  );
 		
 		Img<IntType> labelMap = createLabelMap_forTheTreeLabeling(labelMapMaxTree.copy(), input, nodeIdToLabel, globalThreshold, peakFloodingPercent);
 		
 		return labelMap;
 	}
 	
-
+	/**
+	 * 
+	 * @param hMin
+	 * @param globalThreshold
+	 * @param peakFloodingPercent
+	 * @param Z
+	 * @return
+	 */
 	public Img<IntType>  getHFlooding(float hMin, float globalThreshold, float peakFloodingPercent, int Z)
 	{
 		int nDims = labelMapMaxTree.numDimensions();
@@ -856,7 +856,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			inputHyperslice = input;
 		}
 		
-		int[] nodeIdToLabel = getTreeLabeling( hMin );
+		int[] nodeIdToLabel =  TreeUtils.getTreeLabeling(maxTree, "dynamics", hMin  );
 		
 		Img<IntType> labelMap = createLabelMap_forTheTreeLabeling( labelMapHyperSlice, inputHyperslice, nodeIdToLabel, globalThreshold, peakFloodingPercent);
 		
@@ -864,23 +864,17 @@ public class HWatershedLabeling<T extends RealType<T>> {
 	}
 
 	
-	public int[] getTreeLabeling( float hMin )
-	{
-		createMaxTree2();
-		
-		boolean[] nodeSelection = new boolean[maxTree.getNumNodes()];
-		double[] dynamics = maxTree.getFeature("dynamics");
-		
-		for( int nodeId=0; nodeId<maxTree.getNumNodes(); nodeId++ )
-			nodeSelection[nodeId] = (dynamics[nodeId]>hMin);
-		
-		TreeLabeling treeLabeler = new TreeLabeling(maxTree);
-		int[] nodeIdToLabel =  treeLabeler.getNodeIdToLabel_LUT(nodeSelection, TreeLabeling.Rule.MAX );
-		
-		return nodeIdToLabel;
-	}
 	
 	
+	/**
+	 * 
+	 * @param labelMap
+	 * @param inputIntensity
+	 * @param nodeToLabel
+	 * @param globalThreshold
+	 * @param peakFloodingPercent
+	 * @return
+	 */
 	public <U extends RealType<U>> Img<U> createLabelMap_forTheTreeLabeling(Img<U> labelMap, IterableInterval<T> inputIntensity, int[] nodeToLabel, float globalThreshold, float peakFloodingPercent)
 	{
 		
