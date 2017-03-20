@@ -1,6 +1,7 @@
 package de.mpicbg.scf.InteractiveWatershed;
 
 import net.imglib2.Cursor;
+import net.imglib2.IterableInterval;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.view.Views;
@@ -8,7 +9,7 @@ import net.imglib2.img.Img;
 
 
 // if pos is updated tree labeling does not change
-// if hMin is updated the segmentMap slice is constant but still need to be relabeled. currently we don't keep a copy and have to redo the clicing
+// if hMin is updated the segmentMap slice is constant but still need to be relabeled. currently we don't keep a copy and have to redo the clicking
 
 // ideally multithread the copy of the segmentMap hyperslice (look how to optimize that)
 // as well as the filling of the labelMap 
@@ -18,33 +19,32 @@ import net.imglib2.img.Img;
 
 public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 
-	Tree segmentTree;
+	Tree segmentTree0;
 	Img<IntType> segmentMap0;
 	Img<T> intensity0;
 	
 	int[] nodeIdToLabel;  // current tree labelling
 	
 	Img<IntType> segmentMap; // current hyperslice
-	Img<T> intensity; // current hyperslice
+	IterableInterval<T> intensity; // current hyperslice
 	
 	
 	public SegmentHierarchyToLabelMap(Tree segmentTree, Img<IntType> segmentMap0, Img<T> intensity0 ){
 		
-		this.segmentTree = segmentTree;
+		this.segmentTree0 = segmentTree;
 		this.segmentMap0 = segmentMap0;
 		this.intensity0 = intensity0;
 		
 	}
 	
 	
-	public void updateTreeLabeling(int hMin){
-		nodeIdToLabel =  TreeUtils.getTreeLabeling(segmentTree, "dynamics", hMin  );
+	public void updateTreeLabeling(float hMin){
+		nodeIdToLabel =  TreeUtils.getTreeLabeling(segmentTree0, "dynamics", hMin  );
 	}
 	
-	public Img<IntType> createLabelMap( int threshold, int percentFlooding){
+	public Img<IntType> getLabelMap( float threshold, float percentFlooding){
 		
-		
-		intensity = intensity0;
+		intensity = (IterableInterval<T>) intensity0;
 		segmentMap = segmentMap0.copy();
 		Img<IntType> labelMap = fillLabelMap(threshold, percentFlooding);
 		
@@ -54,7 +54,7 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 	
 	
 	
-	public Img<IntType> createLabelMap( int threshold, int percentFlooding, int dim, long pos){
+	public Img<IntType> getLabelMap( float threshold, float percentFlooding, int dim, long pos){
 		
 		int nDims = segmentMap0.numDimensions();
 		
@@ -77,11 +77,11 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 			while ( cursor.hasNext() )
 				cursor.next().set( cursor0.next().get() );
 			
-			intensity = (Img<T>) Views.hyperSlice(intensity0, dim, pos);
+			intensity = (IterableInterval<T>) Views.hyperSlice(intensity0, dim, pos);
 		}
 		else{
 			segmentMap = segmentMap0.copy();
-			intensity = intensity0;
+			intensity = (IterableInterval<T>) intensity0;
 		}
 		
 		Img<IntType> labelMap = fillLabelMap( threshold, percentFlooding);
@@ -92,9 +92,9 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 	
 	
 	
-	protected Img<IntType> fillLabelMap( int threshold, int percentFlooding ){
+	protected Img<IntType> fillLabelMap( float threshold, float percentFlooding ){
 		
-		double[] Imax = segmentTree.getFeature("Imax");
+		double[] Imax = segmentTree0.getFeature("Imax");
 		
 		int nNode = Imax.length;
 		float[] peakThresholds = new float[nNode];

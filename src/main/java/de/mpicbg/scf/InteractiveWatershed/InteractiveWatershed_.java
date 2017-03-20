@@ -1,24 +1,25 @@
 package de.mpicbg.scf.InteractiveWatershed;
 
 
+import java.awt.Component;
+import java.awt.event.AdjustmentEvent;
+import java.awt.event.AdjustmentListener;
 import java.io.File;
 import java.util.Arrays;
 
 import ij.IJ;
-import ij.ImageListener;
+//import ij.ImageListener;
 import ij.ImagePlus;
 import ij.gui.ImageRoi;
 import ij.gui.Overlay;
+import ij.gui.ScrollbarWithLabel;
 import ij.plugin.Duplicator;
 import ij.plugin.ImageCalculator;
 import ij.plugin.LutLoader;
 import ij.process.ImageProcessor;
 import ij.process.LUT;
-import net.imagej.Dataset;
 import net.imagej.ImageJ;
-import net.imagej.ImgPlus;
 import net.imagej.command.InteractiveImageCommand;
-import net.imagej.ops.OpService;
 import net.imglib2.img.Img;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.RealType;
@@ -44,9 +45,9 @@ import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
  * 	- using the B&C sometimes results in switching the image processor displayed (?)
  *  
  * TODO:
- *  - On image close or on plugin close message to confirm ending of the process (plus warn that non exported data will be lost)
- * 	- relabel the exported image (to get a more intuitive labeling)
- *	
+ *  - relabel the exported image (to get a more intuitive labeling)
+ *  
+ * 
  * Development ideas:
  *  - make sure only the necessary processing is done at each preview() method call
  *  - clean the code
@@ -69,11 +70,11 @@ import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
  */
 @Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive watershed", initializer="initialize_HWatershed", headless = true, label="Interactive watershed")
 //public class InteractiveMaxTree_<T extends RealType<T> > extends DynamicCommand implements Previewable  {
-public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveImageCommand implements Previewable  {
+public class InteractiveWatershed_ extends InteractiveImageCommand implements Previewable  {
 
 	// -- Parameters --
 	@Parameter (type = ItemIO.BOTH)
-	private	Dataset dataset;
+	private	ImagePlus imp0;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Seed dynamics", stepSize="0.05")
 	private Float seed_threshold;
@@ -90,8 +91,6 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 	@Parameter(label = "export", callback="exportButton_callback" )
 	private Button testButton;
 	
-	@Parameter
-	private OpService ops;
 	
 	
 	
@@ -115,9 +114,13 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 	
 	int nLabel;
 	ImagePlus impSegmentationDisplay;
-	ImagePlus input_imp; // copy of the input dataset for displaying results
+	//ImagePlus input_imp; // copy of the input dataset for displaying results
 	ImagePlus imp_curSeg;
 	
+	
+	// refactor
+	SegmentHierarchyToLabelMap<FloatType> segmentHierarchyLabeler;
+
 	
 	// -- Command methods --
 
@@ -128,52 +131,62 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 	// -- Initializer methods --
 	protected void initialize_HWatershed() {	
 		
-		if (dataset == null)
-		{
+		if (imp0 == null){
 			return;
 		}
 		
-		Img<FloatType> input = ops.convert().float32( (ImgPlus<T>) dataset.getImgPlus() );
-		//input_imp =  ImageJFunctions.wrapFloat(input, "test");
-		ImagePlus input_imp0 =  ImageJFunctions.wrapFloat(input, "test"); // this create a virtual stack that is not convenient for to catch a plane, hence the duplication on the following line
-		input_imp = input_imp0.duplicate();
+		Img<FloatType> input = ImageJFunctions.convertFloat(imp0); 
+		int nDims = input.numDimensions();
+		is3D = nDims>2?true:false;
+		if( nDims>3){
+			IJ.error("The Interactive Watershed plugin handles only graylevel 2D/3D images \n Current image has more dimensions." );
+		}
 		
-		ImagePlus imp0= IJ.getImage();
-		input_displayRange[0] = (float)imp0.getDisplayRangeMin();
-		input_displayRange[1] = (float)imp0.getDisplayRangeMax();
+
+		
+		///////////////////////////////////////////////////////////////////////////
+		// create the HSegmentTree ////////////////////////////////////////////////
 		
 		float threshold = Float.NEGATIVE_INFINITY;
-		
-		
 		maxTreeConstructor = new HWatershedLabeling<FloatType>(input, threshold, Connectivity.FACE);
+		Tree hSegmentTree = maxTreeConstructor.getTree();
+		Img<IntType> hSegmentMap = maxTreeConstructor.getLabelMapMaxTree();
+		segmentHierarchyLabeler = new SegmentHierarchyToLabelMap<FloatType>( hSegmentTree, hSegmentMap, input );
 		
+		
+
+		///////////////////////////////////////////////////////////////////////////
+		// Initialize the UI //////////////////////////////////////////////////////
+
 		double[] dynamics = maxTreeConstructor.getTree().getFeature("dynamics");
 		maxI = (float) Arrays.stream(dynamics).max().getAsDouble();
-		minI = 0 ;
+		minI = (float) Arrays.stream(dynamics).min().getAsDouble(); ;
 		
+		// initialize seed threshold (jMin) slider attributes ////////////////////// 
 		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("seed_threshold", Float.class);
 		thresholdItem.setMinimumValue( new Float(0) );
 		thresholdItem.setMaximumValue( new Float(Math.log(maxI-minI+1)) );
-		threshold = minI;
 		thresholdItem.setStepSize( 0.05);
 		
+		
+		// initialize intensity threshold slider attributes ////////////////////////////
 		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("intensity_threshold", Float.class);
 		thresholdItem2.setMinimumValue( new Float(0) );
 		thresholdItem2.setMaximumValue( new Float(Math.log(maxI-minI+1)) );
 		intensity_threshold = minI;
 		thresholdItem2.setStepSize( 0.05);
 		
+		// initialize peak flooding (%) slider attributes ////////////////////////////
 		final MutableModuleItem<Float> thresholdItem3 = getInfo().getMutableInput("peak_floodingPercentage", Float.class);
 		thresholdItem3.setValue(this, 100f);
 		
-		nLabel =  maxTreeConstructor.getTree().getNumNodes();
 		
-		segmentation_displayRange[0] = 0;
-		segmentation_displayRange[1] = 2*nLabel;
 		
-		int nDims = dataset.numDimensions();
+		
+		
+		// initialize the window showing the segmentation display
 		long[] dimensions = new long[nDims];
-		dataset.dimensions(dimensions);
+		input.dimensions(dimensions);
 		if( dimensions.length==2 )
 			impSegmentationDisplay = IJ.createImage("interactive watershed", (int)dimensions[0], (int)dimensions[1], 1, 32);
 		else
@@ -181,8 +194,39 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 		
 		impSegmentationDisplay.show();
 		
-		is3D = nDims>2?true:false;
+		// collect information to initialize visualization of the segmentation display
+		input_displayRange[0] = (float)imp0.getDisplayRangeMin();
+		input_displayRange[1] = (float)imp0.getDisplayRangeMax();
 		
+		nLabel =  maxTreeConstructor.getTree().getNumNodes();
+		segmentation_displayRange[0] = 0;
+		segmentation_displayRange[1] = 2*nLabel;
+		
+		// ready to use component listener on the slider of impSegmentationDisplay
+		Component[] components = impSegmentationDisplay.getWindow().getComponents();
+		for(Component comp : components){
+			if( comp instanceof ScrollbarWithLabel){
+				ScrollbarWithLabel scrollBar = (ScrollbarWithLabel) comp;
+				scrollBar.addAdjustmentListener( new AdjustmentListener(){
+
+					@Override
+					public void adjustmentValueChanged(AdjustmentEvent e) {
+						
+						zSlice = impSegmentationDisplay.getSlice();
+						System.out.println("seg display: zSlice="+zSlice+" ; zSlice_Old="+zSlice_Old);
+						if (zSlice != zSlice_Old )
+						{	
+							preview();
+						}
+						
+					}
+					
+				});
+			}
+		}
+		
+		// add a listener on ImagePlus to update the image in case the z slider position change
+		/*
 		if (is3D )
 		{
 			ImagePlus.addImageListener( new ImageListener(){
@@ -218,11 +262,10 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 								}
 				
 						});
-			
-			
-			
-		}
-	}
+				
+		}*/
+		
+	} // end of the initialisation! 
 	
 	
 	@Override
@@ -233,16 +276,15 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 		if( !firstPreview)
 		{
 			
-			if (displayStyle_Old.startsWith("Contour") | displayStyle_Old.startsWith("Solid") )
-			{
+			// update the saved display parameter in case they were changed
+			if (displayStyle_Old.startsWith("Contour") | displayStyle_Old.startsWith("Solid") ){
 				input_displayRange[0] = impSegmentationDisplay.getDisplayRangeMin();
 				input_displayRange[1] = impSegmentationDisplay.getDisplayRangeMax();
 			}
-			else
-			{
+			else{
 				segmentation_displayRange[0] = impSegmentationDisplay.getDisplayRangeMin();
 				segmentation_displayRange[1] = impSegmentationDisplay.getDisplayRangeMax();
-			}	
+			}
 			segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
 		}
 		else
@@ -254,10 +296,14 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 				| 	intensity_threshold != intensity_threshold_Old
 				|	peak_floodingPercentage != peak_floodingPercentage_Old)
 		{
-			Img<IntType> img_currentSegmentation = maxTreeConstructor.getHFlooding(	(float)Math.exp(seed_threshold)+minI-1, 
-																						(float)Math.exp(intensity_threshold)+minI-1, 
-																						peak_floodingPercentage, 
-																						zSlice-1 	);
+			float IThresh = (float)Math.exp(intensity_threshold)+minI-1;
+			float hMin = (float)Math.exp(seed_threshold)+minI-1;
+			float perc = peak_floodingPercentage; 
+			int dim = 2;
+			long pos = (long)(zSlice-1);
+			segmentHierarchyLabeler.updateTreeLabeling(hMin);
+			Img<IntType> img_currentSegmentation = segmentHierarchyLabeler.getLabelMap(IThresh, perc, dim, pos);
+			//Img<IntType> img_currentSegmentation = maxTreeConstructor.getHFlooding(	hMin, IThresh, peak_floodingPercentage, pos );
 			imp_curSeg = ImageJFunctions.wrapFloat(img_currentSegmentation, "treeCut");
 			
 		}
@@ -267,9 +313,9 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 		
 		ImageProcessor input_ip;
 		if(is3D)
-			input_ip = input_imp.getStack().getProcessor(zSlice);
+			input_ip = imp0.getStack().getProcessor(zSlice).convertToFloatProcessor();
 		else
-			input_ip = input_imp.getProcessor();
+			input_ip = imp0.getProcessor().convertToFloatProcessor();
 		
 		
 		Overlay overlay = new Overlay();
@@ -290,7 +336,7 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 			imageRoi.setPosition(zSlice);
 			overlay.add(imageRoi);
 			
-			input_imp.setPosition(zSlice);
+			//input_imp.setPosition(zSlice);
 			impSegmentationDisplay.setProcessor( input_ip );
 			impSegmentationDisplay.setDisplayRange(input_displayRange[0], input_displayRange[1]);
 			
@@ -337,11 +383,13 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 	protected void exportButton_callback(){
 		System.out.println("Export button click");
 		
-		float T  =(float)Math.exp(intensity_threshold)+minI-1;
-		float h = (float)Math.exp(seed_threshold)+minI-1;
+		float IThresh  =(float)Math.exp(intensity_threshold)+minI-1;
+		float hMin = (float)Math.exp(seed_threshold)+minI-1;
 		float perc = peak_floodingPercentage; 
-		Img<IntType> export_img = maxTreeConstructor.getHFlooding(	h, T, perc);
-		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, dataset.getName() + " - watershed (h="+h+",T="+T+",%="+perc+")" );
+		segmentHierarchyLabeler.updateTreeLabeling(hMin);
+		Img<IntType> export_img = segmentHierarchyLabeler.getLabelMap(IThresh, perc);
+		//Img<IntType> export_img = maxTreeConstructor.getHFlooding(	h, T, perc);
+		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, imp0.getTitle() + " - watershed (h="+hMin+",T="+IThresh+",%="+perc+")" );
 		
 		LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
 		exported_imp.setLut(segmentationLUT);
@@ -360,11 +408,10 @@ public class InteractiveWatershed_<T extends RealType<T> > extends InteractiveIm
 		
 		
 		// Launch the command .
-		//IJ.openImage("http://imagej.nih.gov/ij/images/blobs.gif").show();
-		Dataset dataset = (Dataset) ij.io().open("F:\\projects\\2DEmbryoSection_Mette.tif");//noise2000_blur2.tif");
-		//Dataset dataset = (Dataset) ij.io().open("F:\\projects\\2D_8peaks.tif");
-		
-		ij.ui().show(dataset);
+		IJ.openImage("F:\\projects\\2DEmbryoSection_Mette.tif").show();
+		//Dataset dataset = (Dataset) ij.io().open("F:\\projects\\2DEmbryoSection_Mette.tif");
+		//Dataset dataset2 = (Dataset) ij.io().open("F:\\projects\\2D_8peaks.tif");
+		//ij.ui().show(dataset);
 		
 		ij.command().run(InteractiveWatershed_.class, true);
 		

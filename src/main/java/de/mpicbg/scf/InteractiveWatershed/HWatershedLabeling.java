@@ -130,18 +130,10 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		}
 	}
 	
-	
-	
-	//private double[] hCriteria; // to be initialized at 0
-	//private float[] Imax; // to be initialized at 0
-	//private int[] parent; // to be initialized at minus one (rk it could contain Icriteria which is needed only before parent definition)
-	//private int[][] children;
-	private Img<T> input;
 	private Img<IntType> labelMapMaxTree;
 	private float threshold;
 	private Connectivity connectivity;
 	private boolean maxTreeIsBuilt=false;
-	//private int nLeaves=0;
 	private Tree maxTree;
 	
 	
@@ -150,13 +142,11 @@ public class HWatershedLabeling<T extends RealType<T>> {
 	{
 		int nDims = input.numDimensions();
 		long[] dims = new long[nDims];
-		this.input = input;
 		input.dimensions(dims);
 		ImgFactory<IntType> imgFactoryIntType=null;
 		try {
 			imgFactoryIntType = input.factory().imgFactory( new IntType() );
 		} catch (IncompatibleTypeException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -171,7 +161,6 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			}
 		}
 		
-		//this.labelMapmaxTree = input.copy();
 		this.threshold = threshold;
 		this.connectivity = connectivity;
 	}
@@ -793,134 +782,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		}
 	}
 	
-	
-	
-	
-	
-	//  segment hierarchy relabeling functions
-	
-	
-	/**
-	 * Build the Hmaxima flooding of the original image from the its segment hierarchy (on peak dynamics)
-	 * @param hMin hMaxima parameter to determine flooding seeds
-	 * @param globalThreshold Threshold to stop the flooding
-	 * @param peakFloodingPercent fraction of the 
-	 * @return
-	 */
-	public Img<IntType>  getHFlooding(float hMin, float globalThreshold, float peakFloodingPercent)
-	{
-		int[] nodeIdToLabel =  TreeUtils.getTreeLabeling(maxTree, "dynamics", hMin  );
 		
-		Img<IntType> labelMap = createLabelMap_forTheTreeLabeling(labelMapMaxTree.copy(), input, nodeIdToLabel, globalThreshold, peakFloodingPercent);
-		
-		return labelMap;
-	}
-	
-	/**
-	 * 
-	 * @param hMin
-	 * @param globalThreshold
-	 * @param peakFloodingPercent
-	 * @param Z
-	 * @return
-	 */
-	public Img<IntType>  getHFlooding(float hMin, float globalThreshold, float peakFloodingPercent, int Z)
-	{
-		int nDims = labelMapMaxTree.numDimensions();
-			
-		Img<IntType> labelMapHyperSlice;
-		IterableInterval<T> inputHyperslice;
-		if (nDims>2)
-		{	
-			long[] dimensions = new long[nDims];
-			labelMapMaxTree.dimensions(dimensions);
-			long[] newDimensions = new long[nDims];
-			for ( int d = 0; d < nDims; ++d )
-			{
-				if(d<2)
-					newDimensions[d] = dimensions[d];
-				else
-					newDimensions[d] = 1;
-			}
-			labelMapHyperSlice = labelMapMaxTree.factory().create(newDimensions, labelMapMaxTree.firstElement());
-			Cursor<IntType> cursor = labelMapHyperSlice.cursor();
-			Cursor<IntType> cursor0 = Views.hyperSlice(labelMapMaxTree, 2, Z).cursor();
-			
-			while ( cursor.hasNext() )
-				cursor.next().set( cursor0.next().get() );
-			
-			inputHyperslice =  (IterableInterval<T>) Views.hyperSlice(input, 2, Z);
-		}
-		else{
-			labelMapHyperSlice = labelMapMaxTree.copy();
-			inputHyperslice = input;
-		}
-		
-		int[] nodeIdToLabel =  TreeUtils.getTreeLabeling(maxTree, "dynamics", hMin  );
-		
-		Img<IntType> labelMap = createLabelMap_forTheTreeLabeling( labelMapHyperSlice, inputHyperslice, nodeIdToLabel, globalThreshold, peakFloodingPercent);
-		
-		return labelMap;
-	}
-
-	
-	
-	
-	/**
-	 * 
-	 * @param labelMap
-	 * @param inputIntensity
-	 * @param nodeToLabel
-	 * @param globalThreshold
-	 * @param peakFloodingPercent
-	 * @return
-	 */
-	public <U extends RealType<U>> Img<U> createLabelMap_forTheTreeLabeling(Img<U> labelMap, IterableInterval<T> inputIntensity, int[] nodeToLabel, float globalThreshold, float peakFloodingPercent)
-	{
-		
-		createMaxTree2();
-		
-		double[] Imax = maxTree.getFeature("Imax");
-		
-		int nNode = Imax.length;
-		float[] peakThresholds = new float[nNode];
-		for(int i=0;i<nNode; i++)
-			peakThresholds[i] =  globalThreshold + ((float)Imax[i]-globalThreshold)*(1-peakFloodingPercent/100);
-		
-		Cursor<U> cursor = labelMap.cursor();
-		Cursor<T> cursorImg = inputIntensity.cursor();
-		while( cursor.hasNext() )
-		{
-			T imgPixel = cursorImg.next();
-			float val =imgPixel.getRealFloat();
-			
-			U pixel = cursor.next();
-			int node = (int)pixel.getRealFloat();
-			int label = nodeToLabel[node];
-			
-			if(  val >= globalThreshold )
-			{
-				if(  val >= peakThresholds[label]  )
-				{	
-					float finalVal = (float)label;
-					pixel.setReal( finalVal );
-				}
-				else
-					pixel.setReal( 0.0 );
-			}
-			else
-				pixel.setReal( 0.0 );
-		}
-		return labelMap;
-	}
-	
-	
-	
-	
-	
-	
-	
-	
 	
 
 	
