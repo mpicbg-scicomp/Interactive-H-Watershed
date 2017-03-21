@@ -20,6 +20,7 @@ import ij.gui.ScrollbarWithLabel;
 import ij.plugin.Duplicator;
 import ij.plugin.ImageCalculator;
 import ij.plugin.LutLoader;
+import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 import ij.process.LUT;
 import net.imagej.ImageJ;
@@ -181,11 +182,11 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 		
 		
 		// initialize analyzed image name  ////////////////////// 
-		final MutableModuleItem<String> AnalyzedImageItem = getInfo().getMutableInput("Analyzed_image", String.class);
+		final MutableModuleItem<String> AnalyzedImageItem = getInfo().getMutableInput("analyzedImageName", String.class);
 		AnalyzedImageItem.setValue(this, imp0.getTitle() );
 		
 		// initialize seed threshold (jMin) slider attributes ////////////////////// 
-		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("seed_threshold", Float.class);
+		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("hMin_log", Float.class);
 		thresholdItem.setMinimumValue( new Float(0) );
 		thresholdItem.setMaximumValue( new Float(Math.log(maxI-minI+1)) );
 		thresholdItem.setStepSize( 0.05);
@@ -193,7 +194,7 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 		thresholdItem.setValue(this, hMin_log);
 		
 		// initialize intensity threshold slider attributes ////////////////////////////
-		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("intensity_threshold", Float.class);
+		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("thresh_log", Float.class);
 		thresholdItem2.setMinimumValue( new Float(0) );
 		thresholdItem2.setMaximumValue( new Float(Math.log(maxI-minI+1)) );
 		thresholdItem2.setStepSize( 0.05);
@@ -201,10 +202,11 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 		thresholdItem2.setValue(this, thresh_log);
 		
 		// initialize peak flooding (%) slider attributes ////////////////////////////
-		final MutableModuleItem<Float> thresholdItem3 = getInfo().getMutableInput("peak_floodingPercentage", Float.class);
+		final MutableModuleItem<Float> thresholdItem3 = getInfo().getMutableInput("peakFlooding", Float.class);
 		peakFlooding = 100f;
 		thresholdItem3.setValue(this, peakFlooding);
 		
+				
 		// initialize the image List attributes ////////////////////////////
 		updateImagesToDisplay();
 		
@@ -229,8 +231,11 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 		changed.put("hMin", 			false);
 		changed.put("thresh", 			false);
 		changed.put("peakFlooding", 	false);
+		changed.put("displayOrient",	false);
+		//System.out.println(displayOrientString + " : "+ displayOrient);
 		
 		displayOrient = getDisplayOrient();
+		previous = new HashMap<String,Double>();
 		previous.put("pos", 			(double)pos[displayOrient]);
 		previous.put("hMin", 			(double)getHMin());
 		previous.put("thresh", 			(double)getThresh());
@@ -310,10 +315,7 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 			imageToDisplayName = nameList.get(0);
 		}
 			
-		// check that imageToDisplayName is in the list
-		// if not update image to display to the first item in the list
-		
-		final MutableModuleItem<String> thresholdItem = getInfo().getMutableInput("View_image", String.class);
+		final MutableModuleItem<String> thresholdItem = getInfo().getMutableInput("imageToDisplayName", String.class);
 		thresholdItem.setChoices( nameList );
 		thresholdItem.setValue(this, imageToDisplayName );
 	}
@@ -329,7 +331,7 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 		}
 		
 		// update labelMap slice to visualize
-		if( changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get(displayOrient))
+		if( changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get("displayOrient"))
 		{
 			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
 			imp_curSeg = ImageJFunctions.wrapFloat(img_currentSegmentation, "treeCut");
@@ -363,6 +365,11 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 		//update the list of image that can be overlaid by the segmentation
 		updateImagesToDisplay();
 		
+		// reset all changed field to false
+		for(String key : changed.keySet() ){
+			changed.put(key, false);
+		}
+		
 		// test which parameter has changed (only one can change at a time rk: not true if long update :-\ )
 		boolean wasChanged  = false;
 		if( getThresh() != previous.get("thresh") ){
@@ -382,6 +389,7 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 		}
 		else if( displayOrient != getDisplayOrient() ){
 			displayOrient = getDisplayOrient();
+			changed.put("displayOrient",true);
 			updateSegmentationDisplay();
 			wasChanged  = true;
 		}
@@ -437,28 +445,31 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 	
 	protected void render(){
 		
-		// todo: get the image pointed at by the ui when implemented
-		ImagePlus impToDisplay = WindowManager.getImage( imageToDisplayName );
+		
 		
 		
 		ImageProcessor ip_curSeg  = imp_curSeg.getProcessor();
 		ip_curSeg.setLut( segLut );
 		
+		ImageProcessor input_ip;
+		if( imageToDisplayName.equals("None") ){
+			input_ip = new FloatProcessor( impSegmentationDisplay.getWidth(), impSegmentationDisplay.getHeight() );
+		}
+		else{
+			// todo: get the image pointed at by the ui when implemented
+			ImagePlus impToDisplay = WindowManager.getImage( imageToDisplayName );
+			
+			Img<FloatType> imgToDisplay = ImageJFunctions.wrapFloat( impToDisplay );
+			//RandomAccessible<FloatType> slice = ;
+			//Views.permuteCoordinates(slice, permutation)
+			
+			ImagePlus impToDisplaySlice = ImageJFunctions.wrapFloat( Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1) , "test" );
+			
+			System.out.println("impToDisplaySlice "+ArrayUtils.toString(impToDisplaySlice.getDimensions() ) );
+			
+			input_ip = impToDisplaySlice.getProcessor();
+		}
 		
-		Img<FloatType> imgToDisplay = ImageJFunctions.wrapFloat( impToDisplay );
-		//RandomAccessible<FloatType> slice = ;
-		//Views.permuteCoordinates(slice, permutation)
-		
-		ImagePlus impToDisplaySlice = ImageJFunctions.wrapFloat( Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1) , "test" );
-		
-		System.out.println("impToDisplaySlice "+ArrayUtils.toString(impToDisplaySlice.getDimensions() ) );
-		
-		ImageProcessor input_ip = impToDisplaySlice.getProcessor();
-		
-		/*if(nDims>2)
-			input_ip = imageToDisplay.getStack().getProcessor(pos[displayOrient]).convertToFloatProcessor();
-		else
-			input_ip = imageToDisplay.getProcessor().convertToFloatProcessor();*/
 		
 		
 		Overlay overlay = new Overlay();
