@@ -5,11 +5,15 @@ import java.awt.Component;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import ij.IJ;
-//import ij.ImageListener;
 import ij.ImagePlus;
+import ij.WindowManager;
 import ij.gui.ImageRoi;
 import ij.gui.Overlay;
 import ij.gui.ScrollbarWithLabel;
@@ -20,12 +24,15 @@ import ij.process.ImageProcessor;
 import ij.process.LUT;
 import net.imagej.ImageJ;
 import net.imagej.command.InteractiveImageCommand;
+import net.imglib2.RandomAccessible;
 import net.imglib2.img.Img;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.view.Views;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.scijava.command.Command;
 import org.scijava.command.Previewable;
 import org.scijava.plugin.Parameter;
@@ -35,6 +42,7 @@ import org.scijava.widget.ChoiceWidget;
 import org.scijava.widget.NumberWidget;
 import org.scijava.module.MutableModuleItem;
 import org.scijava.ItemIO;
+import org.scijava.ItemVisibility;
 
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
@@ -46,7 +54,7 @@ import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
  *  
  * TODO:
  *  - relabel the exported image (to get a more intuitive labeling)
- *  
+ *  - implement the run method so the plugin is macroable 
  * 
  * Development ideas:
  *  - make sure only the necessary processing is done at each preview() method call
@@ -76,56 +84,64 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 	@Parameter (type = ItemIO.BOTH)
 	private	ImagePlus imp0;
 	
+	@Parameter(label = "Analyzed image" , visibility = ItemVisibility.MESSAGE)
+	private String analyzedImageName = "test";
+
+	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Seed dynamics", stepSize="0.05")
-	private Float seed_threshold;
+	private Float hMin_log;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Intensity threshold")
-	private Float intensity_threshold;
+	private Float thresh_log;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="peak flooding (in %)", min="0", max="100")
-	private Float peak_floodingPercentage;
+	private Float peakFlooding;
 	
 	@Parameter(style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "Image", "Contour overlay", "Solid overlay" } )
-	private String displayStyle;
+	private String displayStyle = "Image";
+	
+	@Parameter(label = "View", style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "XY", "XZ", "YZ" }, visibility = ItemVisibility.INVISIBLE )
+	private String displayOrientString = "XY";
+	
+	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE, choices = { "" }, visibility = ItemVisibility.INVISIBLE )
+	private String imageToDisplayName;
 	
 	@Parameter(label = "export", callback="exportButton_callback" )
-	private Button testButton;
+	private Button exportButton;
 	
 	
 	
 	
-	// -- Other fields --
-	float minI, maxI;
-	HWatershedLabeling<FloatType> maxTreeConstructor;
+	int[] pos= new int[] { 1, 1, 1};
+	int displayOrient = 2; // 2 is for display orient perpendicular to z direction
+	LUT segLut;
+	LUT imageLut;
+	double[] segDispRange = new double[2];
+	double[] imageDispRange = new double[2];
 	
-	// init interface previous status
+	// to keep track of UI change
+	String displayStyleOld;
+	String imageToDisplayOldName;
+	Map<String, Boolean> changed;
+	Map<String, Double> previous;
 	
-	int zSlice_Old = 1;
-	Float seed_threshold_Old = 0f;
-	Float intensity_threshold_Old = 0f;
-	Float peak_floodingPercentage_Old = 100f;
-	Float dispMin, dispMax;
-	boolean firstPreview = true;
-	String displayStyle_Old="";
-	double[] input_displayRange=new double[2];
-	double[] segmentation_displayRange=new double[2];
-	int zSlice = 1;
-	boolean is3D=false;
-	
-	int nLabel;
-	ImagePlus impSegmentationDisplay;
-	//ImagePlus input_imp; // copy of the input dataset for displaying results
-	ImagePlus imp_curSeg;
-	
-	
-	// refactor
-	SegmentHierarchyToLabelMap<FloatType> segmentHierarchyLabeler;
+	float minI, maxI; // min and max intensity of the input image
+	int nDims; // dimensionnality of the input image
+	SegmentHierarchyToLabelMap<FloatType> segmentTreeLabeler;
 
+	ImagePlus impSegmentationDisplay; // the result window interactively updated
+	ImagePlus imp_curSeg; // container of the current labelMap slice
+	
+	
+	
+	
 	
 	// -- Command methods --
 
 	@Override
-	public void run() {    }
+	public void run() {  
+		// implement to allow macroability !
+	}
 
 
 	// -- Initializer methods --
@@ -136,72 +152,95 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 		}
 		
 		Img<FloatType> input = ImageJFunctions.convertFloat(imp0); 
-		int nDims = input.numDimensions();
-		is3D = nDims>2?true:false;
+		nDims = input.numDimensions();
 		if( nDims>3){
 			IJ.error("The Interactive Watershed plugin handles only graylevel 2D/3D images \n Current image has more dimensions." );
 		}
 		
-
 		
+		imageToDisplayName = imp0.getTitle();
+		imageToDisplayOldName = imageToDisplayName;
+		displayStyleOld = displayStyle;
 		///////////////////////////////////////////////////////////////////////////
 		// create the HSegmentTree ////////////////////////////////////////////////
 		
 		float threshold = Float.NEGATIVE_INFINITY;
-		maxTreeConstructor = new HWatershedLabeling<FloatType>(input, threshold, Connectivity.FACE);
-		Tree hSegmentTree = maxTreeConstructor.getTree();
-		Img<IntType> hSegmentMap = maxTreeConstructor.getLabelMapMaxTree();
-		segmentHierarchyLabeler = new SegmentHierarchyToLabelMap<FloatType>( hSegmentTree, hSegmentMap, input );
+		HWatershedLabeling<FloatType> segmentTreeConstructor = new HWatershedLabeling<FloatType>(input, threshold, Connectivity.FACE);
+		Tree hSegmentTree = segmentTreeConstructor.getTree();
+		Img<IntType> hSegmentMap = segmentTreeConstructor.getLabelMapMaxTree();
+		segmentTreeLabeler = new SegmentHierarchyToLabelMap<FloatType>( hSegmentTree, hSegmentMap, input );
 		
 		
 
 		///////////////////////////////////////////////////////////////////////////
 		// Initialize the UI //////////////////////////////////////////////////////
 
-		double[] dynamics = maxTreeConstructor.getTree().getFeature("dynamics");
+		double[] dynamics = hSegmentTree.getFeature("dynamics");
 		maxI = (float) Arrays.stream(dynamics).max().getAsDouble();
 		minI = (float) Arrays.stream(dynamics).min().getAsDouble(); ;
+		
+		
+		// initialize analyzed image name  ////////////////////// 
+		final MutableModuleItem<String> AnalyzedImageItem = getInfo().getMutableInput("Analyzed_image", String.class);
+		AnalyzedImageItem.setValue(this, imp0.getTitle() );
 		
 		// initialize seed threshold (jMin) slider attributes ////////////////////// 
 		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("seed_threshold", Float.class);
 		thresholdItem.setMinimumValue( new Float(0) );
 		thresholdItem.setMaximumValue( new Float(Math.log(maxI-minI+1)) );
 		thresholdItem.setStepSize( 0.05);
-		
+		hMin_log = 0f;
+		thresholdItem.setValue(this, hMin_log);
 		
 		// initialize intensity threshold slider attributes ////////////////////////////
 		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("intensity_threshold", Float.class);
 		thresholdItem2.setMinimumValue( new Float(0) );
 		thresholdItem2.setMaximumValue( new Float(Math.log(maxI-minI+1)) );
-		intensity_threshold = minI;
 		thresholdItem2.setStepSize( 0.05);
+		thresh_log = 0f;
+		thresholdItem2.setValue(this, thresh_log);
 		
 		// initialize peak flooding (%) slider attributes ////////////////////////////
 		final MutableModuleItem<Float> thresholdItem3 = getInfo().getMutableInput("peak_floodingPercentage", Float.class);
-		thresholdItem3.setValue(this, 100f);
+		peakFlooding = 100f;
+		thresholdItem3.setValue(this, peakFlooding);
 		
+		// initialize the image List attributes ////////////////////////////
+		updateImagesToDisplay();
 		
-		
-		
-		
-		// initialize the window showing the segmentation display
-		long[] dimensions = new long[nDims];
-		input.dimensions(dimensions);
-		if( dimensions.length==2 )
-			impSegmentationDisplay = IJ.createImage("interactive watershed", (int)dimensions[0], (int)dimensions[1], 1, 32);
-		else
-			impSegmentationDisplay = IJ.createImage("interactive watershed", (int)dimensions[0], (int)dimensions[1], (int)dimensions[2], 32);
-		
-		impSegmentationDisplay.show();
+		///////////////////////////////////////////////////////////////////////////////////
+		// initialize plugin state ////////////////////////////////////////////////////////
 		
 		// collect information to initialize visualization of the segmentation display
-		input_displayRange[0] = (float)imp0.getDisplayRangeMin();
-		input_displayRange[1] = (float)imp0.getDisplayRangeMax();
+		imageDispRange[0] = (float)imp0.getDisplayRangeMin();
+		imageDispRange[1] = (float)imp0.getDisplayRangeMax();
 		
-		nLabel =  maxTreeConstructor.getTree().getNumNodes();
-		segmentation_displayRange[0] = 0;
-		segmentation_displayRange[1] = 2*nLabel;
+		int nLabel = hSegmentTree.getNumNodes();
+		segDispRange[0] = 0;
+		segDispRange[1] = 2*nLabel;
 		
+		segLut = LutLoader.openLut( IJ.getDirectory("luts") + File.separator + "glasbey_inverted.lut");
+		imageLut = (LUT) imp0.getProcessor().getLut().clone();
+		
+		
+		// initialize UI status
+		changed = new HashMap<String,Boolean>();
+		changed.put("pos", 				false);
+		changed.put("hMin", 			false);
+		changed.put("thresh", 			false);
+		changed.put("peakFlooding", 	false);
+		
+		displayOrient = getDisplayOrient();
+		previous.put("pos", 			(double)pos[displayOrient]);
+		previous.put("hMin", 			(double)getHMin());
+		previous.put("thresh", 			(double)getThresh());
+		previous.put("peakFlooding", 	(double)peakFlooding);
+		
+		
+		
+		// create the window to show the segmentation display
+		updateSegmentationDisplay();
+				
 		// ready to use component listener on the slider of impSegmentationDisplay
 		Component[] components = impSegmentationDisplay.getWindow().getComponents();
 		for(Component comp : components){
@@ -212,12 +251,9 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 					@Override
 					public void adjustmentValueChanged(AdjustmentEvent e) {
 						
-						zSlice = impSegmentationDisplay.getSlice();
-						System.out.println("seg display: zSlice="+zSlice+" ; zSlice_Old="+zSlice_Old);
-						if (zSlice != zSlice_Old )
-						{	
-							preview();
-						}
+						pos[displayOrient] = impSegmentationDisplay.getSlice();
+						preview();
+						
 						
 					}
 					
@@ -225,97 +261,204 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 			}
 		}
 		
-		// add a listener on ImagePlus to update the image in case the z slider position change
-		/*
-		if (is3D )
-		{
-			ImagePlus.addImageListener( new ImageListener(){
-								
-								@Override
-								public void imageClosed(ImagePlus imp) {
-									System.out.println("image "+imp.getTitle()+" was closed");
-								}
-				
-								@Override
-								public void imageOpened(ImagePlus imp) {
-									System.out.println("image "+imp.getTitle()+" was opened");	
-								}
-				
-								@Override
-								public void imageUpdated(ImagePlus imp) {
-									ImagePlus.removeImageListener(this);
-									
-									System.out.println("image "+imp.getTitle()+" was updated");
-									if ( imp==impSegmentationDisplay )
-									{	
-										zSlice = imp.getSlice();
-										System.out.println("seg display: zSlice="+zSlice+" ; zSlice_Old="+zSlice_Old);
-										if (zSlice != zSlice_Old )
-										{	
-											preview();
-										}
-									}
-									
-									ImagePlus.addImageListener(this);
-										
-										
-								}
-				
-						});
-				
-		}*/
+		segmentTreeLabeler.updateTreeLabeling( getHMin() );
+		Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
+		imp_curSeg = ImageJFunctions.wrapFloat(img_currentSegmentation, "treeCut");
+		render();
 		
-	} // end of the initialisation! 
+		
+	} // end of the initialization! 
+	
+	
+	private float getHMin(){
+		return (float)Math.exp(hMin_log)+minI-1;
+	}
+	
+	private float getThresh(){
+		return (float)Math.exp(thresh_log)+minI-1;
+	}
+	
+	private int getDisplayOrient(){
+		
+		int displayOrient;
+		
+		if( displayOrientString.equals("XZ") ){
+			displayOrient=1;
+		}
+		else if( displayOrientString.equals("YZ") ){
+			displayOrient=0;
+		}
+		else{ //if( displayOrientString.equals("XY") ){
+			displayOrient=2;
+		}
+		return displayOrient;
+	}
+	
+	private void updateImagesToDisplay(){
+		
+		List<String> nameList = new ArrayList<String>();
+		String[] imageNames = WindowManager.getImageTitles();
+		for(String imageName : imageNames){
+			ImagePlus impAux = WindowManager.getImage(imageName);
+			int[] dims = impAux.getDimensions();
+			if( dims.equals( imp0.getDimensions() ) ){
+				nameList.add(imageName);
+			}
+		}
+		nameList.add("None");
+		if( !nameList.contains(imageToDisplayName) ){
+			imageToDisplayName = nameList.get(0);
+		}
+			
+		// check that imageToDisplayName is in the list
+		// if not update image to display to the first item in the list
+		
+		final MutableModuleItem<String> thresholdItem = getInfo().getMutableInput("View_image", String.class);
+		thresholdItem.setChoices( nameList );
+		thresholdItem.setValue(this, imageToDisplayName );
+	}
+	
 	
 	
 	@Override
 	public void preview(){
 		
-		
-		LUT segmentationLUT;
-		if( !firstPreview)
-		{
-			
-			// update the saved display parameter in case they were changed
-			if (displayStyle_Old.startsWith("Contour") | displayStyle_Old.startsWith("Solid") ){
-				input_displayRange[0] = impSegmentationDisplay.getDisplayRangeMin();
-				input_displayRange[1] = impSegmentationDisplay.getDisplayRangeMax();
-			}
-			else{
-				segmentation_displayRange[0] = impSegmentationDisplay.getDisplayRangeMin();
-				segmentation_displayRange[1] = impSegmentationDisplay.getDisplayRangeMax();
-			}
-			segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
+		 // check which parameter changed and update necessary value
+		if( !wasStateChanged() ){
+			return;
 		}
-		else
-			segmentationLUT = LutLoader.openLut( IJ.getDirectory("luts") + File.separator + "glasbey_inverted.lut");
 		
-		
-		if( 		zSlice!=zSlice_Old 
-				| 	seed_threshold != seed_threshold_Old 
-				| 	intensity_threshold != intensity_threshold_Old
-				|	peak_floodingPercentage != peak_floodingPercentage_Old)
+		// update labelMap slice to visualize
+		if( changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get(displayOrient))
 		{
-			float IThresh = (float)Math.exp(intensity_threshold)+minI-1;
-			float hMin = (float)Math.exp(seed_threshold)+minI-1;
-			float perc = peak_floodingPercentage; 
-			int dim = 2;
-			long pos = (long)(zSlice-1);
-			segmentHierarchyLabeler.updateTreeLabeling(hMin);
-			Img<IntType> img_currentSegmentation = segmentHierarchyLabeler.getLabelMap(IThresh, perc, dim, pos);
-			//Img<IntType> img_currentSegmentation = maxTreeConstructor.getHFlooding(	hMin, IThresh, peak_floodingPercentage, pos );
+			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
 			imp_curSeg = ImageJFunctions.wrapFloat(img_currentSegmentation, "treeCut");
-			
 		}
+		else if( changed.get("hMin") )
+		{
+			segmentTreeLabeler.updateTreeLabeling( getHMin() );
+			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
+			imp_curSeg = ImageJFunctions.wrapFloat(img_currentSegmentation, "treeCut");
+		}
+		
+		render();	
+		
+	}
+	
+	private boolean wasStateChanged(){
+	
+		
+		// update the saved display parameter in case they were changed
+		if (displayStyleOld.startsWith("Contour") | displayStyleOld.startsWith("Solid") ){
+			imageDispRange[0] = impSegmentationDisplay.getDisplayRangeMin();
+			imageDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
+			imageLut = (LUT) impSegmentationDisplay.getProcessor().getLut().clone();
+		}
+		else{
+			segDispRange[0] = impSegmentationDisplay.getDisplayRangeMin();
+			segDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
+			segLut = (LUT) imp_curSeg.getProcessor().getLut().clone();
+		}
+		
+		//update the list of image that can be overlaid by the segmentation
+		updateImagesToDisplay();
+		
+		// test which parameter has changed (only one can change at a time rk: not true if long update :-\ )
+		boolean wasChanged  = false;
+		if( getThresh() != previous.get("thresh") ){
+			changed.put("tresh",true);
+			previous.put( "thresh" , (double)getThresh() );
+			wasChanged  = true;
+		}
+		else if( getHMin() != previous.get("hMin") ){
+			changed.put("hMin",true);
+			previous.put( "hMin" , (double)getHMin() );
+			wasChanged  = true;
+		}
+		else if( (double)peakFlooding != previous.get("peakFlooding") ){
+			changed.put("peakFlooding",true);
+			previous.put( "peakFlooding" , (double)peakFlooding );
+			wasChanged  = true;
+		}
+		else if( displayOrient != getDisplayOrient() ){
+			displayOrient = getDisplayOrient();
+			updateSegmentationDisplay();
+			wasChanged  = true;
+		}
+		else if( (double)pos[displayOrient] != previous.get("pos") ){
+			changed.put("pos",true);
+			previous.put( "pos" , (double)pos[displayOrient] );
+			wasChanged  = true;
+		}
+		else if( displayStyleOld != displayStyle ){
+			displayStyleOld = displayStyle;
+			wasChanged  = true;
+		}
+		else if( ! imageToDisplayOldName.equals(imageToDisplayName) ){
+			imageToDisplayOldName = imageToDisplayName;
+			wasChanged  = true;
+		}
+		
+		return wasChanged;
+	}
+	
+	
+	private void updateSegmentationDisplay(){
+		
+		
+		
+		if( impSegmentationDisplay != null ){
+			impSegmentationDisplay.hide();
+		}
+		
+		int[] dims=imp0.getDimensions();
+		if( nDims==2 ){
+			impSegmentationDisplay = IJ.createImage("interactive watershed-"+displayOrientString, (int)imp0.getWidth(), (int)imp0.getHeight(), 1, 32);
+		}
+		else{
+			int[] dimensions = new int[nDims-1];
+			
+			int count=0;
+			for(int d=0; d<nDims; d++){
+				if(d != displayOrient){
+					dimensions[count]= dims[d];
+					count++;
+				}
+			}
+			impSegmentationDisplay = IJ.createImage("interactive watershed-"+displayOrientString, (int)dimensions[0], (int)dimensions[1], (int)dims[displayOrient], 32);
+		}
+		
+		impSegmentationDisplay.show();
+	}
+	
+	
+	
+	
+	
+	protected void render(){
+		
+		// todo: get the image pointed at by the ui when implemented
+		ImagePlus impToDisplay = WindowManager.getImage( imageToDisplayName );
+		
 		
 		ImageProcessor ip_curSeg  = imp_curSeg.getProcessor();
-		ip_curSeg.setLut( segmentationLUT );
+		ip_curSeg.setLut( segLut );
 		
-		ImageProcessor input_ip;
-		if(is3D)
-			input_ip = imp0.getStack().getProcessor(zSlice).convertToFloatProcessor();
+		
+		Img<FloatType> imgToDisplay = ImageJFunctions.wrapFloat( impToDisplay );
+		//RandomAccessible<FloatType> slice = ;
+		//Views.permuteCoordinates(slice, permutation)
+		
+		ImagePlus impToDisplaySlice = ImageJFunctions.wrapFloat( Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1) , "test" );
+		
+		System.out.println("impToDisplaySlice "+ArrayUtils.toString(impToDisplaySlice.getDimensions() ) );
+		
+		ImageProcessor input_ip = impToDisplaySlice.getProcessor();
+		
+		/*if(nDims>2)
+			input_ip = imageToDisplay.getStack().getProcessor(pos[displayOrient]).convertToFloatProcessor();
 		else
-			input_ip = imp0.getProcessor().convertToFloatProcessor();
+			input_ip = imageToDisplay.getProcessor().convertToFloatProcessor();*/
 		
 		
 		Overlay overlay = new Overlay();
@@ -333,12 +476,12 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 			ImageRoi imageRoi = new ImageRoi(0,0, imp_Contour.getProcessor() );
 			imageRoi.setOpacity(0.75);
 			imageRoi.setZeroTransparent(true);
-			imageRoi.setPosition(zSlice);
+			imageRoi.setPosition(pos[displayOrient]);
 			overlay.add(imageRoi);
 			
 			//input_imp.setPosition(zSlice);
 			impSegmentationDisplay.setProcessor( input_ip );
-			impSegmentationDisplay.setDisplayRange(input_displayRange[0], input_displayRange[1]);
+			impSegmentationDisplay.setDisplayRange(imageDispRange[0], imageDispRange[1]);
 			
 		}
 		else if ( displayStyle.startsWith("Solid"))
@@ -346,31 +489,44 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 			ImageRoi imageRoi = new ImageRoi(0,0, ip_curSeg );
 			imageRoi.setOpacity(0.5);
 			imageRoi.setZeroTransparent(true);
-			imageRoi.setPosition(zSlice);
+			imageRoi.setPosition(pos[displayOrient]);
 			overlay.add(imageRoi);
 
 			impSegmentationDisplay.setProcessor( input_ip );
-			impSegmentationDisplay.setDisplayRange(input_displayRange[0], input_displayRange[1]);
+			impSegmentationDisplay.setDisplayRange(imageDispRange[0], imageDispRange[1]);
 
 		}
 		else
 		{
 			impSegmentationDisplay.setProcessor( ip_curSeg );
-			impSegmentationDisplay.setDisplayRange( segmentation_displayRange[0], segmentation_displayRange[1]);
+			impSegmentationDisplay.setDisplayRange( segDispRange[0], segDispRange[1]);
 		}
 		
 		impSegmentationDisplay.setOverlay(overlay);
 		impSegmentationDisplay.show();
 		
 		
-		firstPreview = false;
-		displayStyle_Old = displayStyle;
-		zSlice_Old = zSlice;
-		seed_threshold_Old = seed_threshold;
-		intensity_threshold_Old = intensity_threshold;
-		peak_floodingPercentage_Old = peak_floodingPercentage;
+		
 	}
 	
+	
+	
+	
+	// todo: 
+	//	- give proper hyperStack shape to the output (cf imagTools utils)
+	//	- label from one to number of region
+	
+	protected void exportButton_callback(){
+		
+		segmentTreeLabeler.updateTreeLabeling( getHMin() );
+		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( getThresh() , peakFlooding);
+		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, imp0.getTitle() + " - watershed (h="+getHMin()+",T="+getThresh()+",%="+peakFlooding+")" );
+		
+		LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
+		exported_imp.setLut(segmentationLUT);
+		exported_imp.show();
+
+	}
 	
 	
 	@Override
@@ -378,26 +534,14 @@ public class InteractiveWatershed_ extends InteractiveImageCommand implements Pr
 		// this function in never called in interactive command
 		
 	}
-	
-	
-	protected void exportButton_callback(){
-		System.out.println("Export button click");
-		
-		float IThresh  =(float)Math.exp(intensity_threshold)+minI-1;
-		float hMin = (float)Math.exp(seed_threshold)+minI-1;
-		float perc = peak_floodingPercentage; 
-		segmentHierarchyLabeler.updateTreeLabeling(hMin);
-		Img<IntType> export_img = segmentHierarchyLabeler.getLabelMap(IThresh, perc);
-		//Img<IntType> export_img = maxTreeConstructor.getHFlooding(	h, T, perc);
-		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, imp0.getTitle() + " - watershed (h="+hMin+",T="+IThresh+",%="+perc+")" );
-		
-		LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
-		exported_imp.setLut(segmentationLUT);
-		exported_imp.show();
+
 		
 		
-	}
-	
+		
+			
+			
+			
+		
 	
 	
 	
