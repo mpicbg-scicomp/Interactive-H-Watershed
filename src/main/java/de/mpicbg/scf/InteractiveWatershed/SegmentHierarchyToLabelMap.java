@@ -62,15 +62,18 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 		{	
 			long[] dimensions = new long[nDims];
 			segmentMap0.dimensions(dimensions);
-			long[] newDimensions = new long[nDims];
-			for ( int d = 0; d < nDims; ++d )
+			long[] newDimensions = new long[nDims-1];
+			int count = 0;
+			for ( int d = 0; d < nDims ; ++d )
 			{
-				if(d<2)
-					newDimensions[d] = dimensions[d];
-				else
-					newDimensions[d] = 1;
+				if(d!=dim){
+					newDimensions[count] = dimensions[d];
+					count++;
+				}
+				//else
+					//newDimensions[d] = 1;
 			}
-			segmentMap = segmentMap0.factory().create(newDimensions, segmentMap0.firstElement());
+			segmentMap = segmentMap0.factory().create(newDimensions, segmentMap0.firstElement().createVariable());
 			Cursor<IntType> cursor = segmentMap.cursor();
 			Cursor<IntType> cursor0 = Views.hyperSlice(segmentMap0, dim, pos).cursor();
 			
