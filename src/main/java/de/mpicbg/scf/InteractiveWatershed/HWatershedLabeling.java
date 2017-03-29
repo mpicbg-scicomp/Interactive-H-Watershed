@@ -10,14 +10,12 @@ import ij.IJ;
 import ij.ImagePlus;
 import de.mpicbg.scf.InteractiveWatershed.HierarchicalFIFO;
 import de.mpicbg.scf.InteractiveWatershed.Tree;
-import de.mpicbg.scf.InteractiveWatershed.TreeUtils;
 import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
 import de.mpicbg.scf.imgtools.image.create.image.ImagePlusImgConverter;
 import de.mpicbg.scf.imgtools.image.create.labelmap.LocalMaximaLabeling;
 import de.mpicbg.scf.imgtools.image.neighborhood.ImageConnectivity;
 import net.imglib2.Cursor;
 import net.imglib2.FinalInterval;
-import net.imglib2.IterableInterval;
 import net.imglib2.RandomAccess;
 import net.imglib2.algorithm.stats.ComputeMinMax;
 import net.imglib2.exception.IncompatibleTypeException;
@@ -35,15 +33,13 @@ import net.imglib2.view.Views;
  * 2016/07/05: First implementation of the max tree  
  * 
  * Remark: the input image is duplicated and will not be modified during the process 
- * Remark: the input type should be able to represent the number of nodes of the tree number (2 time the number of maxima in input minus one) 
  * 
  * todo:
  *  - clean the class, check usability of getter, setter, constructor, move the plugin specific part to the plugin
  *  - check for the possibility to build a tree from seeds and list the required change (for instance to ensure Imin, Imax, and dynamics are properly calculated)
  *  - explore the possibility to separate watershed and segment hierarchy (to gain speed with the watershed and flexibility for hierarchy construction)
- *  - Multithread tree and image relabeling (to keep some interactivity with very large plane)
- *		+ Remark: what is the bottleneck? tree labeling or image labeling, something else?
- * @param <T>
+ * 
+ *  @param <T>
  */
 
 

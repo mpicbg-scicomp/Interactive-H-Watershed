@@ -51,35 +51,12 @@ import org.scijava.ItemVisibility;
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
 /**
- * An ImageJ2 command using the HWatershedLabelling class
+ * An plugin allowing to explore the watershed from hMaxima 
  * 
+ * Todo:
+ *  - see googleDrive document
  *  
- * TODO:
- *  - relabel the exported image (to get a more intuitive labeling)
- *  - implement the run method so the plugin is macroable 
- *  - key listener sur le slider de l'image don't trigger segmentation update 
- *  - recreate display window on preview() if it was closed
- *  - list and prioritize Todos
- *  
- * Development ideas:
- *  - could implement a proper contour copnstruction (might be faster and label will be the same in solid/contour/image mode)
- *  - update status info with label value  under the slider
- *	- resample data to give an isotropic view (especially in side view)
- *	- building a swing UI would give a lot more flexibility in polishing the ui
- *	- faster watershed to limit waiting time
- *	- identify bottleneck in ui update 
- *	- there is an histogram widget in IJ, it could be put in sync with the intensity threshold parameter
- *	- the log slider are nice but the value display is not intuitive (fine to do in a classic ui)
- *	- the input harvester cannot be refreshed => view image list  is not updated  (fine to do in a classic ui)
- *
- *	Beyond the current plugin:
- *	- Given all the possible segment in the space (seed dynamics, flooding level) would it be possible to select the segments 
- *    with the best shapes given a simple shape model (feature vector on each regions)
- *  - probably not possible to explore all segments in the tree x threshold space
- *  	* build a new tree on the segment intersecting a given binarisation (i.e. segmentation on the dynamics hierarchy) 
- *  - Let user select some good/bad segment to create a shape/non-shape model
- *  - Let user correct some bad segmentation to create an improved merging criteria
- *  - learn a merging criteria
+ * known issue: the input harvester cannot be refreshed => view image list is not updated
  * 
  */
 @Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive watershed", initializer="initialize_HWatershed", headless = true, label="Interactive watershed")
