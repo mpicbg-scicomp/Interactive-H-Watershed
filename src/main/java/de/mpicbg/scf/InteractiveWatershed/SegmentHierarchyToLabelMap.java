@@ -1,5 +1,8 @@
 package de.mpicbg.scf.InteractiveWatershed;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import net.imglib2.Cursor;
 import net.imglib2.IterableInterval;
 import net.imglib2.type.numeric.RealType;
@@ -37,15 +40,42 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 		
 	}
 	
+
+	public int updateTreeLabeling(float hMin ){
+		boolean makeNewLabels = false;
+		nodeIdToLabel =  TreeUtils.getTreeLabeling(segmentTree0, "dynamics", hMin, makeNewLabels  );
+		return getNumberOfLabels();
+	}
+
+	public int updateTreeLabeling(float hMin, boolean makeNewLabels ){
+		nodeIdToLabel =  TreeUtils.getTreeLabeling(segmentTree0, "dynamics", hMin, makeNewLabels  );
+		return getNumberOfLabels();
+	}
 	
-	public void updateTreeLabeling(float hMin){
-		nodeIdToLabel =  TreeUtils.getTreeLabeling(segmentTree0, "dynamics", hMin  );
+	private int getNumberOfLabels(){
+		Set<Integer> labelSet = new HashSet<Integer>();
+		if( nodeIdToLabel != null )
+			for( int val : nodeIdToLabel)
+				if( val>0)
+					labelSet.add(val);
+		return labelSet.size();
 	}
 	
 	public Img<IntType> getLabelMap( float threshold, float percentFlooding){
 		
 		intensity = (IterableInterval<T>) intensity0;
-		segmentMap = segmentMap0.copy();
+		
+		int nDims = segmentMap0.numDimensions();
+		long[] dims = new long[nDims];
+		segmentMap0.dimensions(dims);
+		segmentMap = segmentMap0.factory().create(dims, segmentMap0.firstElement().createVariable() );
+		Cursor<IntType> cursor = segmentMap.cursor();
+		Cursor<IntType> cursor0 = segmentMap0.cursor();
+		while(cursor0.hasNext()){
+			cursor.next().set( cursor0.next().get() );
+		}
+		
+		
 		Img<IntType> labelMap = fillLabelMap(threshold, percentFlooding);
 		
 		return labelMap;
@@ -83,7 +113,14 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 			intensity = (IterableInterval<T>) Views.hyperSlice(intensity0, dim, pos);
 		}
 		else{
-			segmentMap = segmentMap0.copy();
+			long[] dims = new long[nDims];
+			segmentMap0.dimensions(dims);
+			segmentMap = segmentMap0.factory().create(dims, segmentMap0.firstElement().createVariable() );
+			Cursor<IntType> cursor = segmentMap.cursor();
+			Cursor<IntType> cursor0 = segmentMap0.cursor();
+			while(cursor0.hasNext()){
+				cursor.next().set( cursor0.next().get() );
+			}
 			intensity = (IterableInterval<T>) intensity0;
 		}
 		
@@ -102,7 +139,7 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 		int nNode = Imax.length;
 		float[] peakThresholds = new float[nNode];
 		for(int i=0;i<nNode; i++)
-			peakThresholds[i] =  threshold + ((float)Imax[i]-threshold)*(1-percentFlooding/100);
+			peakThresholds[i] =  threshold + ((float)Imax[i]-threshold)*(1f-percentFlooding/100f);
 		
 		Cursor<IntType> cursor = segmentMap.cursor();
 		Cursor<T> cursorImg = intensity.cursor();
@@ -114,10 +151,10 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 			IntType pixel = cursor.next();
 			int node = (int)pixel.getRealFloat();
 			int label = nodeIdToLabel[node];
-			
+			int labelRoot = segmentTree0.nodes.get(node).labelRoot;
 			if(  val >= threshold )
 			{
-				if(  val >= peakThresholds[label]  )
+				if(  val >= peakThresholds[labelRoot]  )
 				{	
 					float finalVal = (float)label;
 					pixel.setReal( finalVal );

@@ -5,16 +5,23 @@ import java.util.List;
 import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
 
 public class TreeUtils {
+
 	
+	static public int[] getTreeLabeling(Tree tree, String featureName, double cut){
+		boolean makeNewLabels = false;
+		return getTreeLabeling(tree, featureName, cut, makeNewLabels);
+	}
+
 	
 	/**
 	 * Return a node labeling corresponding to a merging of all the nodes below the feature cut value  
 	 * @param tree the tree to label
 	 * @param featureName name of the tree feature on which the tree will be labeled
 	 * @param cut any node below that value is label similar to its parent
+	 * @param makeNewLabels if true new labels from 1 to the number of CCs below the cut
 	 * @return an array matching tree nodes to a label
 	 */
-	static public int[] getTreeLabeling(Tree tree, String featureName, double cut){
+	static public int[] getTreeLabeling(Tree tree, String featureName, double cut, boolean makeNewLabels){
 		
 		
 		int[] nodeIdToLabel;
@@ -28,6 +35,23 @@ public class TreeUtils {
 		}
 		else{
 			LinkedList<Node> labelSeeds = getLabelRoots(tree, feature, cut );
+			
+			// set a label for each node
+			if( makeNewLabels ){
+				int label = 1;
+				for(Node node : labelSeeds){
+					node.setDecoration( label );
+					node.labelRoot = node.getId();
+					label++;
+				}
+			}
+			else{ // we the node ID as a label
+				for(Node node : labelSeeds){
+					node.setDecoration( node.getId() );
+					node.labelRoot = node.getId();
+				}
+			}
+			
 			nodeIdToLabel = labelFromSeeds(tree, labelSeeds);
 		}
 		
@@ -92,11 +116,6 @@ public class TreeUtils {
 			
 		}
 		
-		// set a label for each node
-		for(Node node : Q_toLabel){
-			node.setDecoration( node.getId() );
-		}
-		
 		return Q_toLabel;
 	}
 	
@@ -113,6 +132,7 @@ public class TreeUtils {
 			final Node node = labelSeeds.poll();
 			for( Node child : node.getChildren() ){	
 				child.setDecoration( node.getDecoration() );
+				child.labelRoot = node.labelRoot;
 				labelSeeds.add(child);
 			}
 		}

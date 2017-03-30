@@ -4,6 +4,8 @@ package de.mpicbg.scf.InteractiveWatershed;
 import java.awt.Component;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -12,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import ij.IJ;
+import ij.ImageListener;
 import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.ImageRoi;
@@ -86,7 +89,7 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 	@Parameter(label = "Slicing axis", style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "X", "Y", "Z" })
 	private String slicingDirection = "Z";
 	
-	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE, choices = { "" })
+	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE)
 	private String imageToDisplayName;
 	
 	@Parameter(label = "export", callback="exportButton_callback" )
@@ -278,19 +281,23 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 	
 	private void updateImagesToDisplay(){
 		
+		System.out.println("imageToDisplayName " + imageToDisplayName );
+		
+		
 		List<String> nameList = new ArrayList<String>();
 		String[] imageNames = WindowManager.getImageTitles();
 		
-		System.out.println(ArrayUtils.toString(imageNames) );
+		//System.out.println(ArrayUtils.toString(imageNames) );
 		
+		nameList.add("None");
 		int[] dims0 = imp0.getDimensions();
 		for(String imageName : imageNames){
 			ImagePlus impAux = WindowManager.getImage(imageName);
 			
 			int[] dims = impAux.getDimensions();
 			
-			System.out.println(imageName+" : "+impAux.getTitle() );
-			System.out.println(ArrayUtils.toString(dims) );
+			//System.out.println(imageName+" : "+impAux.getTitle() );
+			//System.out.println(ArrayUtils.toString(dims) );
 			
 			boolean isSizeEqual = true;
 			for(int d=0; d<dims.length; d++)
@@ -300,19 +307,26 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 				nameList.add(imageName);
 			}
 		}
-		nameList.add("None");
 		if( impSegmentationDisplay != null){
 			if ( nameList.contains( impSegmentationDisplay.getTitle() ) ){
 				nameList.remove( impSegmentationDisplay.getTitle() );
 			}
 		}
+		int idx;
 		if( !nameList.contains(imageToDisplayName) ){
-			imageToDisplayName = nameList.get(0);
+			idx = nameList.indexOf("None");
 		}
+		else
+			idx = nameList.indexOf(imageToDisplayName); 
 			
 		final MutableModuleItem<String> imageToDisplayItem = getInfo().getMutableInput("imageToDisplayName", String.class);
 		imageToDisplayItem.setChoices( nameList );
-		imageToDisplayItem.setValue(this, imageToDisplayName );
+		
+		System.out.println("imageToDisplayName " + imageToDisplayName );
+		imageToDisplayItem.setValue(this, nameList.get(idx) );
+		
+		System.out.println("itemValue " + imageToDisplayItem.getValue(this) );
+		System.out.println("imageToDisplayName " + imageToDisplayName );
 		
 		//this.update( imageToDisplayItem , imageToDisplayName );
 		//this.updateInput( imageToDisplayItem );
@@ -338,9 +352,9 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 			
 			long[] dimTest = new long[img_currentSegmentation.numDimensions()];
 			img_currentSegmentation.dimensions(dimTest);
-			System.out.println("img_currentSegmentation "+ArrayUtils.toString( dimTest ) );
-			System.out.println("slicing direction "+ displayOrient);
-			System.out.println("pos[slicingDir] "+ pos[displayOrient]);
+			//System.out.println("img_currentSegmentation "+ArrayUtils.toString( dimTest ) );
+			//System.out.println("slicing direction "+ displayOrient);
+			//System.out.println("pos[slicingDir] "+ pos[displayOrient]);
 			
 			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
 		}
@@ -353,10 +367,10 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
 		}
 		
-		int[] dimsTest = imp_curSeg.getDimensions();
-		System.out.println("imp_curSeg "+ArrayUtils.toString( dimsTest ) );
-		System.out.println("slicing direction "+ displayOrient);
-		System.out.println("pos[slicingDir] "+ pos[displayOrient]);
+		//int[] dimsTest = imp_curSeg.getDimensions();
+		//System.out.println("imp_curSeg "+ArrayUtils.toString( dimsTest ) );
+		//System.out.println("slicing direction "+ displayOrient);
+		//System.out.println("pos[slicingDir] "+ pos[displayOrient]);
 		
 		render();	
 		
@@ -372,11 +386,15 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 				imageDispRange[0] = impSegmentationDisplay.getDisplayRangeMin();
 				imageDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
 				imageLut = (LUT) impSegmentationDisplay.getProcessor().getLut().clone();
+				
+				System.out.println("image LUT: " + imageLut.toString() + "  ;  range: " + ArrayUtils.toString(imageDispRange) );
 			}
 			else{
 				segDispRange[0] = impSegmentationDisplay.getDisplayRangeMin();
 				segDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
 				segLut = (LUT) imp_curSeg.getProcessor().getLut().clone();
+				
+				System.out.println("seg LUT: " + segLut.toString() + "  ;  range: " + ArrayUtils.toString(segDispRange) );
 			}
 		}
 		else{
@@ -384,7 +402,7 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 		}
 		
 		//update the list of image that can be overlaid by the segmentation
-		updateImagesToDisplay();
+		//updateImagesToDisplay();
 		
 		// reset all changed field to false
 		for(String key : changed.keySet() ){
@@ -393,11 +411,11 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 		
 		// test which parameter has changed (only one can change at a time rk: not true if long update :-\ )
 		boolean wasChanged  = false;
-		System.out.println("getTresh():"+getThresh()+"  ;  previous thresh"+previous.get("thresh"));
+		//System.out.println("getTresh():"+getThresh()+"  ;  previous thresh"+previous.get("thresh"));
 		if( getThresh() != previous.get("thresh") ){
 			changed.put("thresh",true);
 			previous.put( "thresh" , (double)getThresh() );
-			System.out.println("updated  :    getTresh():"+getThresh()+"  ;  previous thresh"+previous.get("thresh"));
+			//System.out.println("updated  :    getTresh():"+getThresh()+"  ;  previous thresh"+previous.get("thresh"));
 			
 			wasChanged  = true;
 		}
@@ -431,14 +449,16 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 			wasChanged  = true;
 		}
 		
+		System.out.println( previous.toString() );
+		System.out.println( changed.toString() );
+		
+		
 		return wasChanged;
 	}
 	
 	
 	
 	private void updateSegmentationDisplay(){
-		
-		
 		
 		int[] dims=imp0.getDimensions();
 		
@@ -475,21 +495,49 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 	
 	private void addListenerToSegDisplay(){
 		// ready to use component listener on the slider of impSegmentationDisplay
+		/*
 		Component[] components = impSegmentationDisplay.getWindow().getComponents();
+		
 		for(Component comp : components){
-			if( comp instanceof ScrollbarWithLabel){
+			if( comp instanceof ScrollbarWithLabel)
+			{
 				ScrollbarWithLabel scrollBar = (ScrollbarWithLabel) comp;
+				
 				scrollBar.addAdjustmentListener( new AdjustmentListener(){
 
 					@Override
 					public void adjustmentValueChanged(AdjustmentEvent e) {	
 						pos[displayOrient] = impSegmentationDisplay.getSlice();
-						preview();	
+						preview();
 					}
 					
 				});
+				
 			}
 		}
+		*/
+		ImageListener impListener = new ImageListener(){
+
+			@Override
+			public void imageClosed(ImagePlus arg0) {	}
+
+			@Override
+			public void imageOpened(ImagePlus arg0) {	}
+
+			@Override
+			public void imageUpdated(ImagePlus arg0) {
+				ImagePlus.removeImageListener(this);
+
+				pos[displayOrient] = impSegmentationDisplay.getSlice();
+				if ( pos[displayOrient] != previous.get("pos") )
+					preview();
+				
+				ImagePlus.addImageListener(this);
+			}	
+		};
+		
+		ImagePlus.addImageListener(impListener);
+		
 	}
 	
 	
@@ -508,8 +556,8 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 			// todo: get the image pointed at by the ui when implemented
 			ImagePlus impToDisplay = WindowManager.getImage( imageToDisplayName );
 			
-			System.out.println(imageToDisplayName+" : "+impToDisplay.toString() );
-			System.out.println(imageToDisplayName+" : "+impToDisplay.getTitle() );
+			//System.out.println(imageToDisplayName+" : "+impToDisplay.toString() );
+			//System.out.println(imageToDisplayName+" : "+impToDisplay.getTitle() );
 			
 			
 			ImagePlus impToDisplaySlice;
@@ -522,9 +570,9 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 				
 				long[] dimTest = new long[ imgToDisplay.numDimensions()];
 				imgToDisplay.dimensions(dimTest);
-				System.out.println("impToDisplaySlice "+ArrayUtils.toString( dimTest ) );
-				System.out.println("slicing direction "+ displayOrient);
-				System.out.println("pos[slicingDir] "+ pos[displayOrient]);
+				//System.out.println("impToDisplaySlice "+ArrayUtils.toString( dimTest ) );
+				//System.out.println("slicing direction "+ displayOrient);
+				//System.out.println("pos[slicingDir] "+ pos[displayOrient]);
 				
 				RandomAccessibleInterval<?> slice =  Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1);
 				slice =  Views.dropSingletonDimensions(slice);
@@ -537,8 +585,8 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 				impToDisplaySlice = ImageJFunctions.wrap(imgSlice, "test");
 			}
 			
-			System.out.println("nDims "+ nDims);
-			System.out.println("impToDisplaySlice "+ArrayUtils.toString(impToDisplaySlice.getDimensions() ) );
+			//System.out.println("nDims "+ nDims);
+			//System.out.println("impToDisplaySlice "+ArrayUtils.toString(impToDisplaySlice.getDimensions() ) );
 			
 			input_ip = impToDisplaySlice.getProcessor().convertToFloat();
 		}
@@ -596,20 +644,28 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 	
 	
 	
-	// todo: 
-	//	- give proper hyperStack shape to the output (cf imagTools utils)
-	//	- label from one to number of region
-	
 	protected void exportButton_callback(){
 		
-		segmentTreeLabeler.updateTreeLabeling( getHMin() );
-		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( getThresh() , peakFlooding);
-		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, imp0.getTitle() + " - watershed (h="+getHMin()+",T="+getThresh()+",%="+peakFlooding+")" );
+		boolean makeNewLabels = true ; 
+		double hMin = previous.get("hMin");
+		double thresh = previous.get("thresh");
+		double peakFlooding = previous.get("peakFlooding");
 		
+		int nLabels = segmentTreeLabeler.updateTreeLabeling( (float)hMin , makeNewLabels);
+		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)thresh , (float)peakFlooding).copy();
+		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, imp0.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+nLabels+")" );
+		
+		int zMax=1;
+		if( nDims==3 )
+			zMax = (int)export_img.dimension(3); 
+		
+		exported_imp.setDimensions(1, zMax, 1);
+		exported_imp.setOpenAsHyperStack(true);
 		LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
 		exported_imp.setLut(segmentationLUT);
+		exported_imp.setDisplayRange(0, nLabels, 0);
 		exported_imp.show();
-
+		
 	}
 	
 	
