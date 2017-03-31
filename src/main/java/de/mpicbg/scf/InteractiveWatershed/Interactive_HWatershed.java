@@ -1,11 +1,7 @@
 package de.mpicbg.scf.InteractiveWatershed;
 
 
-import java.awt.Component;
-import java.awt.event.AdjustmentEvent;
-import java.awt.event.AdjustmentListener;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,13 +15,14 @@ import ij.ImagePlus;
 import ij.WindowManager;
 import ij.gui.ImageRoi;
 import ij.gui.Overlay;
-import ij.gui.ScrollbarWithLabel;
 import ij.plugin.Duplicator;
 import ij.plugin.ImageCalculator;
 import ij.plugin.LutLoader;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 import ij.process.LUT;
+import ij.plugin.frame.Recorder;
+
 import net.imagej.ImageJ;
 import net.imglib2.Cursor;
 import net.imglib2.RandomAccessibleInterval;
@@ -62,17 +59,15 @@ import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
  * known issue: the input harvester cannot be refreshed => view image list is not updated
  * 
  */
-@Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive watershed", initializer="initialize_HWatershed", headless = true, label="Interactive watershed")
-//public class InteractiveMaxTree_<T extends RealType<T> > extends DynamicCommand implements Previewable  {
-public class InteractiveWatershed_ extends InteractiveCommand implements Previewable  {
+@Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive H-Watershed", initializer="initialize_HWatershed", headless = true, label="Interactive H-Watershed")
+public class Interactive_HWatershed extends InteractiveCommand implements Previewable  {
 
 	// -- Parameters --
 	@Parameter (type = ItemIO.BOTH)
 	private	ImagePlus imp0;
 	
-	@Parameter(label = "Analyzed image" , visibility = ItemVisibility.MESSAGE)
+	@Parameter(label = "Analyzed image" , visibility = ItemVisibility.MESSAGE, persist = false)
 	private String analyzedImageName = "test";
-
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Seed dynamics", stepSize="0.05")
 	private Float hMin_log;
@@ -127,7 +122,8 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 
 	@Override
 	public void run() {  
-		// implement to allow macroability !
+		// not implemented
+		// on export a string is printed allowing to reproduce the same result with a simplified plugin
 	}
 
 
@@ -652,7 +648,7 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 		double peakFlooding = previous.get("peakFlooding");
 		
 		int nLabels = segmentTreeLabeler.updateTreeLabeling( (float)hMin , makeNewLabels);
-		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)thresh , (float)peakFlooding).copy();
+		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)thresh , (float)peakFlooding);
 		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, imp0.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+nLabels+")" );
 		
 		int zMax=1;
@@ -665,6 +661,17 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 		exported_imp.setLut(segmentationLUT);
 		exported_imp.setDisplayRange(0, nLabels, 0);
 		exported_imp.show();
+		
+		Recorder recorder =  Recorder.getInstance();  
+		if( recorder != null ){
+			if( !Recorder.scriptMode() ){
+				Recorder.record("run","H-Watershed", "impin=[" + imp0.getTitle() + "] hmin=" + hMin + " thresh=" + thresh + " peakflooding=" + peakFlooding);
+			}
+			else{
+				Recorder.recordCall("# @ImageJ ij");
+				Recorder.recordCall("impOUT = ij.op().run(\"H-Watershed\", impIn, "+hMin+", "+thresh+", "+peakFlooding+")");
+			}
+		}
 		
 	}
 	
@@ -697,7 +704,7 @@ public class InteractiveWatershed_ extends InteractiveCommand implements Preview
 		//Dataset dataset2 = (Dataset) ij.io().open("F:\\projects\\2D_8peaks.tif");
 		//ij.ui().show(dataset);
 		
-		ij.command().run(InteractiveWatershed_.class, true);
+		ij.command().run(Interactive_HWatershed.class, true);
 		
 		
 	}
