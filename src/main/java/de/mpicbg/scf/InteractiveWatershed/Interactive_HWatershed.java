@@ -2,6 +2,18 @@ package de.mpicbg.scf.InteractiveWatershed;
 
 
 
+import java.awt.Component;
+import java.awt.Scrollbar;
+import java.awt.event.AdjustmentEvent;
+import java.awt.event.AdjustmentListener;
+import java.awt.event.ComponentEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,8 +25,12 @@ import ij.IJ;
 import ij.ImageListener;
 import ij.ImagePlus;
 import ij.WindowManager;
+import ij.gui.ImageCanvas;
 import ij.gui.ImageRoi;
+import ij.gui.ImageWindow;
 import ij.gui.Overlay;
+import ij.gui.ScrollbarWithLabel;
+import ij.measure.Calibration;
 import ij.plugin.Duplicator;
 import ij.plugin.ImageCalculator;
 import ij.plugin.LutLoader;
@@ -22,7 +38,6 @@ import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 import ij.process.LUT;
 import ij.plugin.frame.Recorder;
-
 import net.imagej.ImageJ;
 import net.imglib2.Cursor;
 import net.imglib2.RandomAccessibleInterval;
@@ -60,7 +75,7 @@ import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
  * 
  */
 @Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive H-Watershed", initializer="initialize_HWatershed", headless = true, label="Interactive H-Watershed")
-public class Interactive_HWatershed extends InteractiveCommand implements Previewable  {
+public class Interactive_HWatershed extends InteractiveCommand implements Previewable, MouseMotionListener {
 
 	// -- Parameters --
 	@Parameter (type = ItemIO.BOTH)
@@ -84,7 +99,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(label = "Slicing axis", style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "X", "Y", "Z" })
 	private String slicingDirection = "Z";
 	
-	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE)
+	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE, persist = false) // persist is important otherwise it keep the value used previously independant what is set manually
 	private String imageToDisplayName;
 	
 	@Parameter(label = "export", callback="exportButton_callback" )
@@ -95,6 +110,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	//private EventService eventService;
 	
 	int[] pos= new int[] { 1, 1, 1};
+	double[] spacing = new double[] { 1, 1, 1};
 	int displayOrient = 2; // 2 is for display orient perpendicular to z direction
 	LUT segLut;
 	LUT imageLut;
@@ -114,7 +130,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	ImagePlus impSegmentationDisplay; // the result window interactively updated
 	ImagePlus imp_curSeg; // container of the current labelMap slice
 	
-	
+	ImageListener impListener;
 	
 	
 	
@@ -144,6 +160,9 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		imageToDisplayName = imp0.getTitle();
 		imageToDisplayOldName = imageToDisplayName;
 		displayStyleOld = displayStyle;
+		Calibration cal = imp0.getCalibration();
+		spacing = new double[] {cal.pixelWidth, cal.pixelHeight, cal.pixelDepth};
+		
 		///////////////////////////////////////////////////////////////////////////
 		// create the HSegmentTree ////////////////////////////////////////////////
 		
@@ -191,7 +210,6 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				
 		// initialize the image List attributes ////////////////////////////
 		updateImagesToDisplay();
-		
 		
 		// slicing direction
 		if( nDims==2){
@@ -242,6 +260,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		render();
 		
 		
+		
 	} // end of the initialization! 
 	
 	
@@ -277,7 +296,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	private void updateImagesToDisplay(){
 		
-		System.out.println("imageToDisplayName " + imageToDisplayName );
+		//System.out.println("imageToDisplayName " + imageToDisplayName );
 		
 		
 		List<String> nameList = new ArrayList<String>();
@@ -285,7 +304,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		
 		//System.out.println(ArrayUtils.toString(imageNames) );
 		
-		nameList.add("None");
+		
 		int[] dims0 = imp0.getDimensions();
 		for(String imageName : imageNames){
 			ImagePlus impAux = WindowManager.getImage(imageName);
@@ -303,6 +322,11 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				nameList.add(imageName);
 			}
 		}
+		nameList.add("None");
+		//nameList.add("Z");
+		//nameList.add("0");
+		
+		
 		if( impSegmentationDisplay != null){
 			if ( nameList.contains( impSegmentationDisplay.getTitle() ) ){
 				nameList.remove( impSegmentationDisplay.getTitle() );
@@ -318,11 +342,11 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		final MutableModuleItem<String> imageToDisplayItem = getInfo().getMutableInput("imageToDisplayName", String.class);
 		imageToDisplayItem.setChoices( nameList );
 		
-		System.out.println("imageToDisplayName " + imageToDisplayName );
+		//System.out.println("imageToDisplayName " + imageToDisplayName );
 		imageToDisplayItem.setValue(this, nameList.get(idx) );
 		
-		System.out.println("itemValue " + imageToDisplayItem.getValue(this) );
-		System.out.println("imageToDisplayName " + imageToDisplayName );
+		//System.out.println("itemValue " + imageToDisplayItem.getValue(this) );
+		//System.out.println("imageToDisplayName " + imageToDisplayName );
 		
 		//this.update( imageToDisplayItem , imageToDisplayName );
 		//this.updateInput( imageToDisplayItem );
@@ -334,10 +358,13 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Override
 	public void preview(){
 		
-		 // check which parameter changed and update necessary value
+		
+		// check which parameter changed and update necessary value
 		if( !wasStateChanged() ){
 			return;
 		}
+		
+		
 		
 		// update labelMap slice to visualize
 		if( changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get("displayOrient"))
@@ -363,12 +390,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
 		}
 		
+		
 		//int[] dimsTest = imp_curSeg.getDimensions();
 		//System.out.println("imp_curSeg "+ArrayUtils.toString( dimsTest ) );
 		//System.out.println("slicing direction "+ displayOrient);
 		//System.out.println("pos[slicingDir] "+ pos[displayOrient]);
 		
 		render();	
+		
 		
 	}
 	
@@ -377,24 +406,40 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	private boolean wasStateChanged(){
 		
 		// update the saved display parameter in case they were changed
+		/*
+		System.out.println( impSegmentationDisplay.toString() );
+		if( !impSegmentationDisplay.isVisible()){
+			impSegmentationDisplay.show();
+			System.out.println( "impSegmentationDisplay is not visible" );
+		}
+		if( impSegmentationDisplay.getWindow() == null){
+			System.out.println( "impSegmentationDisplay window is null" );
+			impSegmentationDisplay.flush();
+			impSegmentationDisplay=null;
+		}
+		else{
+			System.out.println("impSegmentationDisplay window :" + impSegmentationDisplay.getWindow().toString() );
+		}*/
+		
 		if( !(impSegmentationDisplay==null) ){
 			if (displayStyleOld.startsWith("Contour") | displayStyleOld.startsWith("Solid") ){
 				imageDispRange[0] = impSegmentationDisplay.getDisplayRangeMin();
 				imageDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
 				imageLut = (LUT) impSegmentationDisplay.getProcessor().getLut().clone();
 				
-				System.out.println("image LUT: " + imageLut.toString() + "  ;  range: " + ArrayUtils.toString(imageDispRange) );
+				//System.out.println("image LUT: " + imageLut.toString() + "  ;  range: " + ArrayUtils.toString(imageDispRange) );
 			}
 			else{
 				segDispRange[0] = impSegmentationDisplay.getDisplayRangeMin();
 				segDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
 				segLut = (LUT) imp_curSeg.getProcessor().getLut().clone();
 				
-				System.out.println("seg LUT: " + segLut.toString() + "  ;  range: " + ArrayUtils.toString(segDispRange) );
+				//System.out.println("seg LUT: " + segLut.toString() + "  ;  range: " + ArrayUtils.toString(segDispRange) );
 			}
 		}
 		else{
-			updateSegmentationDisplay();
+			//System.out.println( "impSegmentationDisplay==null" );
+			//updateSegmentationDisplay();
 		}
 		
 		//update the list of image that can be overlaid by the segmentation
@@ -445,8 +490,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			wasChanged  = true;
 		}
 		
-		System.out.println( previous.toString() );
-		System.out.println( changed.toString() );
+		//System.out.println( previous.toString() );
+		//System.out.println( changed.toString() );
 		
 		
 		return wasChanged;
@@ -459,8 +504,9 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		int[] dims=imp0.getDimensions();
 		
 		if( nDims==2 ){
-			if( impSegmentationDisplay == null )
+			if( impSegmentationDisplay == null ){
 				impSegmentationDisplay = IJ.createImage("interactive watershed", (int)imp0.getWidth(), (int)imp0.getHeight(), 1, 32);
+			}
 		}
 		else{
 			int[] dimensions = new int[nDims-1];
@@ -481,41 +527,54 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			
 		}
 		
+		impSegmentationDisplay.setZ(pos[displayOrient]);
 		impSegmentationDisplay.show();
 		addListenerToSegDisplay();
 		
-		impSegmentationDisplay.setZ(pos[displayOrient]);
+		
 	}
 	
 	
 	
 	private void addListenerToSegDisplay(){
-		// ready to use component listener on the slider of impSegmentationDisplay
-		/*
-		Component[] components = impSegmentationDisplay.getWindow().getComponents();
 		
+		// ready to use component listener on the slider of impSegmentationDisplay 		
+ 		Component[] components = impSegmentationDisplay.getWindow().getComponents();
 		for(Component comp : components){
-			if( comp instanceof ScrollbarWithLabel)
-			{
+			if( comp instanceof ScrollbarWithLabel){ 				
 				ScrollbarWithLabel scrollBar = (ScrollbarWithLabel) comp;
-				
-				scrollBar.addAdjustmentListener( new AdjustmentListener(){
-
-					@Override
-					public void adjustmentValueChanged(AdjustmentEvent e) {	
-						pos[displayOrient] = impSegmentationDisplay.getSlice();
-						preview();
+				Component[] components2 =  scrollBar.getComponents();
+				for(Component comp2 : components2){
+					if( comp2 instanceof Scrollbar){
+						Scrollbar scrollBar2 = (Scrollbar) comp2;
+						scrollBar2.addAdjustmentListener( new AdjustmentListener(){
+							@Override
+							public void adjustmentValueChanged(AdjustmentEvent e) {
+								pos[displayOrient] = impSegmentationDisplay.getSlice();
+								preview();
+							}
+						});
 					}
-					
-				});
-				
+				}
 			}
 		}
-		*/
-		ImageListener impListener = new ImageListener(){
+  				
+		
+		
+		impListener = new ImageListener(){
 
 			@Override
-			public void imageClosed(ImagePlus arg0) {	}
+			public void imageClosed(ImagePlus imp) {
+				
+				//ImagePlus.removeImageListener(this);
+				//if( imp.equals(impSegmentationDisplay)){
+				//	impSegmentationDisplay.flush();
+				//	impSegmentationDisplay = null;
+				//	updateSegmentationDisplay();
+				//	render();
+				//}
+				
+			}
 
 			@Override
 			public void imageOpened(ImagePlus arg0) {	}
@@ -532,7 +591,28 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			}	
 		};
 		
-		ImagePlus.addImageListener(impListener);
+		//ImagePlus.addImageListener(impListener); // not always satisfying  does not always register the
+		
+		
+		impSegmentationDisplay.getCanvas().addMouseMotionListener( this );
+		
+		KeyListener keyListener = new KeyListener(){
+			@Override
+			public void keyPressed(KeyEvent e) {
+				pos[displayOrient] = impSegmentationDisplay.getSlice();
+				preview();	
+				System.out.println("hello key pressed");
+				e.consume();
+			}
+			@Override
+			public void keyTyped(KeyEvent e) { System.out.println("hello key typed");}
+			@Override
+			public void keyReleased(KeyEvent e) { System.out.println("hello key released");}
+		};
+		
+		//impSegmentationDisplay.getCanvas().addKeyListener( keyListener );
+		//impSegmentationDisplay.getWindow().addKeyListener( keyListener );
+				
 		
 	}
 	
@@ -545,17 +625,12 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		ip_curSeg.setLut( segLut );
 		
 		ImageProcessor input_ip;
-		if( imageToDisplayName.equals("None") ){
+		if( imageToDisplayName.equals("None") || imageToDisplayName.equals("Z") || imageToDisplayName.equals("0")){
 			input_ip = new FloatProcessor( impSegmentationDisplay.getWidth(), impSegmentationDisplay.getHeight() );
 		}
 		else{
-			// todo: get the image pointed at by the ui when implemented
 			ImagePlus impToDisplay = WindowManager.getImage( imageToDisplayName );
-			
-			//System.out.println(imageToDisplayName+" : "+impToDisplay.toString() );
-			//System.out.println(imageToDisplayName+" : "+impToDisplay.getTitle() );
-			
-			
+				
 			ImagePlus impToDisplaySlice;
 			if( nDims == 2){
 				impToDisplaySlice = impToDisplay;
@@ -566,10 +641,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				
 				long[] dimTest = new long[ imgToDisplay.numDimensions()];
 				imgToDisplay.dimensions(dimTest);
-				//System.out.println("impToDisplaySlice "+ArrayUtils.toString( dimTest ) );
-				//System.out.println("slicing direction "+ displayOrient);
-				//System.out.println("pos[slicingDir] "+ pos[displayOrient]);
-				
+					
 				RandomAccessibleInterval<?> slice =  Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1);
 				slice =  Views.dropSingletonDimensions(slice);
 				Cursor<? extends RealType<?>> cSlice0 = (Cursor<? extends RealType<?>>) Views.iterable(slice).cursor();
@@ -579,11 +651,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 					cSlice.next().set(cSlice0.next().getRealFloat() );
 					
 				impToDisplaySlice = ImageJFunctions.wrap(imgSlice, "test");
-			}
-			
-			//System.out.println("nDims "+ nDims);
-			//System.out.println("impToDisplaySlice "+ArrayUtils.toString(impToDisplaySlice.getDimensions() ) );
-			
+			}			
 			input_ip = impToDisplaySlice.getProcessor().convertToFloat();
 		}
 		
@@ -711,4 +779,74 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 
 
 	
+
+	@Override
+	public void mouseDragged(MouseEvent e) {	}
+
+
+	@Override
+	public void mouseMoved(MouseEvent e) {
+		if( getImageCanvas(e) == null){
+			System.out.println("canvas is null");
+			return;
+		}
+		if(impSegmentationDisplay == null){
+			System.out.println("impSegmentationDisplay is null");
+			return;
+		}
+		
+				
+		ImagePlus currentImage = getImageCanvas(e).getImage();
+		if(   impSegmentationDisplay.equals( currentImage ) )
+		{
+			String statusStr = "";
+			double[] vals = new double[] {getXPix(e),getYPix(e)};
+			int count=0;
+			String[] axisStr = new String[] {"x","y","z"};
+			for(int d=0; d<nDims; d++){
+				if(d != displayOrient){
+					statusStr += ", "+axisStr[d]+"="+(vals[count]-1)*spacing[d];
+					count++;
+				}
+				else if( nDims==3){
+					statusStr += ", "+axisStr[d]+"="+(pos[displayOrient]-1)*spacing[displayOrient];
+				}
+			}	
+			
+			int imageValue = impSegmentationDisplay.getPixel( getXPix(e), getYPix(e) )[0];
+			float imageValue2 = Float.intBitsToFloat(imageValue);
+			statusStr += ", value=" + imageValue2;
+			
+			Overlay overlay = impSegmentationDisplay.getOverlay();
+			if ( overlay != null )
+				if(overlay.get(0) instanceof ImageRoi ){
+					int labelValue = imp_curSeg.getPixel( getXPix(e), getYPix(e) )[0];
+					float labelValue2 = Float.intBitsToFloat(labelValue);
+					statusStr += ", label=" + labelValue2;
+				}
+			
+			IJ.showStatus( statusStr );
+		}
+		e.consume();
+	}
+
+
+	// helper, from Fiji abstract tool
+	public ImageCanvas getImageCanvas(ComponentEvent e) {
+		Component component = e.getComponent();
+		return component instanceof ImageCanvas ? (ImageCanvas)component :
+			(component instanceof ImageWindow ? ((ImageWindow)component).getCanvas() : null);
+	}
+	
+	public int getXPix(MouseEvent e) {
+		ImageCanvas canvas = getImageCanvas(e);
+		return canvas == null ? -1 : canvas.offScreenX(e.getX());
+	}
+
+	public int getYPix(MouseEvent e) {
+		ImageCanvas canvas = getImageCanvas(e);
+		return canvas == null ? -1 : canvas.offScreenX(e.getY());
+	}
+
+
 }
