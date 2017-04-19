@@ -684,17 +684,23 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				imgToDisplay.dimensions(dimDisplay);
 					
 				RandomAccessibleInterval<FloatType> slice =  Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1);
-				//slice =  Views.dropSingletonDimensions(slice);
+				slice =  Views.dropSingletonDimensions(slice);
+							
+				int sNDim0 = slice.numDimensions();
+				long[] sDim0 = new long[sNDim0];
+				slice.dimensions(sDim0);
+				//System.out.println("slice dim: "+ArrayUtils.toString(sDim0));
+					
 				Cursor<FloatType> cSlice0 = (Cursor<FloatType>) Views.flatIterable(slice).cursor();
-				Img<FloatType> imgSlice = new ArrayImgFactory< FloatType >().create( new long[] { impSegmentationDisplay.getWidth(), impSegmentationDisplay.getHeight() }, new FloatType() );
+				Img<FloatType> imgSlice = new ArrayImgFactory< FloatType >().create( new long[] { sDim0[0], sDim0[1] }, new FloatType() );
 				Cursor<FloatType> cSlice = imgSlice.cursor();
 				while(cSlice.hasNext())
 					cSlice.next().set(cSlice0.next().getRealFloat() );
-				
+						
 				Img<FloatType> imgSlice2;
 				if( upSample ){	
 					long[] outSize = new long[] {impSegmentationDisplay.getWidth(), impSegmentationDisplay.getHeight()};
-					imgSlice2 = Utils.upsample(imgSlice, outSize, Utils.Interpolator.NearestNeighbor);
+					imgSlice2 = Utils.upsample(imgSlice, outSize, Utils.Interpolator.NearestNeighbor);	
 				}
 				else{
 					imgSlice2 = imgSlice;
