@@ -41,9 +41,12 @@ import ij.plugin.frame.Recorder;
 import net.imagej.ImageJ;
 import net.imglib2.Cursor;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.RealRandomAccess;
 import net.imglib2.img.Img;
+import net.imglib2.img.ImgFactory;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.img.display.imagej.ImageJFunctions;
+import net.imglib2.interpolation.randomaccess.NearestNeighborInterpolatorFactory;
 import net.imglib2.type.numeric.NumericType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
@@ -64,6 +67,7 @@ import org.scijava.ItemIO;
 import org.scijava.ItemVisibility;
 
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
+import de.mpicbg.scf.InteractiveWatershed.Utils.Interpolator;
 
 /**
  * An plugin allowing to explore the watershed from hMaxima 
@@ -109,6 +113,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	//@Parameter
 	//private EventService eventService;
 	
+	
 	int[] pos= new int[] { 1, 1, 1};
 	double[] spacing = new double[] { 1, 1, 1};
 	int displayOrient = 2; // 2 is for display orient perpendicular to z direction
@@ -133,6 +138,18 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	ImageListener impListener;
 	
 	
+	
+	
+	
+	
+	boolean upSample = true;
+	
+	
+	
+	
+	
+	
+	double[] displaySpacing;
 	
 	// -- Command methods --
 
@@ -162,6 +179,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		displayStyleOld = displayStyle;
 		Calibration cal = imp0.getCalibration();
 		spacing = new double[] {cal.pixelWidth, cal.pixelHeight, cal.pixelDepth};
+		displaySpacing = new double[] {spacing[0], spacing[1]};
 		
 		///////////////////////////////////////////////////////////////////////////
 		// create the HSegmentTree ////////////////////////////////////////////////
@@ -516,6 +534,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			for(int d=0; d<nDims; d++){
 				if(d != displayOrient){
 					dimensions[count]= dims[ dIndex[d] ];
+					displaySpacing[count] = spacing[d];
 					count++;
 				}
 			}
@@ -523,6 +542,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				impSegmentationDisplay.hide();
 				impSegmentationDisplay.flush();
 			}
+			
+			if( upSample ){
+				double minDispSpacing = Math.min( displaySpacing[0], displaySpacing[1] );
+				float[] upSampleFactors = new float[] {(float) (displaySpacing[0]/minDispSpacing) , (float) (displaySpacing[1]/minDispSpacing)};
+				dimensions[0] = (int) (dimensions[0]*upSampleFactors[0]); 
+				dimensions[1] = (int) (dimensions[1]*upSampleFactors[1]); 
+			}
+				
 			impSegmentationDisplay = IJ.createImage("interactive watershed-"+slicingDirection, "32-bit", (int)dimensions[0], (int)dimensions[1], 1, (int)dims[dIndex[displayOrient]], 1);
 			
 		}
@@ -620,10 +647,24 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	protected <T extends NumericType<T>> void render(){
 			
-		//imp_curSeg.updateImage();
-		ImageProcessor ip_curSeg  = imp_curSeg.getProcessor();
+		//get the processor of the segmentation to be displayed
+		ImagePlus imp_curSeg2;
+		if( upSample ){	
+			Img<FloatType> imgCurSeg = ImageJFunctions.wrapFloat( imp_curSeg );
+			long[] outSize = new long[] {impSegmentationDisplay.getWidth(), impSegmentationDisplay.getHeight()};
+			Img<FloatType> imgCurSeg2 = Utils.upsample( imgCurSeg, outSize, Utils.Interpolator.NearestNeighbor);
+			imp_curSeg2 = ImageJFunctions.wrap(imgCurSeg2, "segmentation");
+		}
+		else{
+			imp_curSeg2 = imp_curSeg;
+		}
+		imp_curSeg.getProcessor().setLut(segLut);
+		ImageProcessor ip_curSeg  = imp_curSeg2.getProcessor();
 		ip_curSeg.setLut( segLut );
 		
+		
+		
+		// get the processor of the background image to be displayed
 		ImageProcessor input_ip;
 		if( imageToDisplayName.equals("None") || imageToDisplayName.equals("Z") || imageToDisplayName.equals("0")){
 			input_ip = new FloatProcessor( impSegmentationDisplay.getWidth(), impSegmentationDisplay.getHeight() );
@@ -636,21 +677,29 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				impToDisplaySlice = impToDisplay;
 			}
 			else{
-				Img<?> imgToDisplay = ImageJFunctions.wrap( impToDisplay );
+				Img<FloatType> imgToDisplay = ImageJFunctions.wrapFloat(impToDisplay );
 				
 				
-				long[] dimTest = new long[ imgToDisplay.numDimensions()];
-				imgToDisplay.dimensions(dimTest);
+				long[] dimDisplay = new long[ imgToDisplay.numDimensions()];
+				imgToDisplay.dimensions(dimDisplay);
 					
-				RandomAccessibleInterval<?> slice =  Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1);
-				slice =  Views.dropSingletonDimensions(slice);
-				Cursor<? extends RealType<?>> cSlice0 = (Cursor<? extends RealType<?>>) Views.iterable(slice).cursor();
+				RandomAccessibleInterval<FloatType> slice =  Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1);
+				//slice =  Views.dropSingletonDimensions(slice);
+				Cursor<FloatType> cSlice0 = (Cursor<FloatType>) Views.flatIterable(slice).cursor();
 				Img<FloatType> imgSlice = new ArrayImgFactory< FloatType >().create( new long[] { impSegmentationDisplay.getWidth(), impSegmentationDisplay.getHeight() }, new FloatType() );
 				Cursor<FloatType> cSlice = imgSlice.cursor();
 				while(cSlice.hasNext())
 					cSlice.next().set(cSlice0.next().getRealFloat() );
-					
-				impToDisplaySlice = ImageJFunctions.wrap(imgSlice, "test");
+				
+				Img<FloatType> imgSlice2;
+				if( upSample ){	
+					long[] outSize = new long[] {impSegmentationDisplay.getWidth(), impSegmentationDisplay.getHeight()};
+					imgSlice2 = Utils.upsample(imgSlice, outSize, Utils.Interpolator.NearestNeighbor);
+				}
+				else{
+					imgSlice2 = imgSlice;
+				}
+				impToDisplaySlice = ImageJFunctions.wrap(imgSlice2, "test");
 			}			
 			input_ip = impToDisplaySlice.getProcessor().convertToFloat();
 		}
@@ -663,11 +712,11 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		{
 			
 			Duplicator duplicator = new Duplicator();
-			ImagePlus imp_curSeg_Dilate = duplicator.run(imp_curSeg);
+			ImagePlus imp_curSeg_Dilate = duplicator.run(imp_curSeg2);
 			
 			IJ.run(imp_curSeg_Dilate, "Maximum...", "radius=1");
 			ImageCalculator ic = new ImageCalculator();
-			imp_Contour = ic.run("Subtract create", imp_curSeg_Dilate, imp_curSeg);
+			imp_Contour = ic.run("Subtract create", imp_curSeg_Dilate, imp_curSeg2);
 			
 			ImageRoi imageRoi = new ImageRoi(0,0, imp_Contour.getProcessor() );
 			imageRoi.setOpacity(0.75);
