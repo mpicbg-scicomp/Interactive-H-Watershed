@@ -82,9 +82,9 @@ public class Utils {
 	}
 	
 	
-	public static Img<?> wrapImagePlus( ImagePlus imp){
+	public static Img<? extends RealType<?>> wrapImagePlus( ImagePlus imp){
 		
-		Img<?> img = null;
+		Img<? extends RealType<?>> img = null;
 		int type = imp.getType(); 
 		
 		switch( type ){
@@ -98,10 +98,12 @@ public class Utils {
 			img = ImageJFunctions.wrapFloat(imp);
 			break;
 		case ImagePlus.COLOR_256:
-			img = ImageJFunctions.wrapRGBA(imp);			
+			IJ.error("image type ("+type+") not handled. "+imp.toString() );
+			//img = ImageJFunctions.wrapRGBA(imp);			
 			break;
 		case ImagePlus.COLOR_RGB:
-			img = ImageJFunctions.wrapRGBA(imp);			
+			IJ.error("image type ("+type+") not handled. "+imp.toString() );
+			//img = ImageJFunctions.wrapRGBA(imp);			
 			break;
 		default:
 			IJ.error("image type ("+type+") not handled. "+imp.toString() );

@@ -47,6 +47,7 @@ import net.imglib2.img.ImgFactory;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.img.display.imagej.ImageJFunctions;
 import net.imglib2.interpolation.randomaccess.NearestNeighborInterpolatorFactory;
+import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.NumericType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
@@ -677,13 +678,13 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				impToDisplaySlice = impToDisplay;
 			}
 			else{
-				Img<FloatType> imgToDisplay = ImageJFunctions.wrapFloat(impToDisplay );
+				Img<? extends RealType<?> > imgToDisplay = Utils.wrapImagePlus( impToDisplay );
 				
 				
 				long[] dimDisplay = new long[ imgToDisplay.numDimensions()];
 				imgToDisplay.dimensions(dimDisplay);
 					
-				RandomAccessibleInterval<FloatType> slice =  Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1);
+				RandomAccessibleInterval<? extends RealType<?> > slice =  Views.hyperSlice(imgToDisplay, displayOrient, pos[displayOrient]-1);
 				slice =  Views.dropSingletonDimensions(slice);
 							
 				int sNDim0 = slice.numDimensions();
@@ -691,13 +692,16 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				slice.dimensions(sDim0);
 				//System.out.println("slice dim: "+ArrayUtils.toString(sDim0));
 					
-				Cursor<FloatType> cSlice0 = (Cursor<FloatType>) Views.flatIterable(slice).cursor();
+				Cursor<? extends RealType<?> > cSlice0 =  (Cursor<? extends RealType<?>>)  Views.flatIterable(slice).cursor();
+				
+				//Img< FloatType > imgSlice = imgToDisplay.factory().create( new long[] { sDim0[0], sDim0[1] }, new FloatType(0) );
+				
 				Img<FloatType> imgSlice = new ArrayImgFactory< FloatType >().create( new long[] { sDim0[0], sDim0[1] }, new FloatType() );
-				Cursor<FloatType> cSlice = imgSlice.cursor();
+				Cursor< FloatType > cSlice = imgSlice.cursor();
 				while(cSlice.hasNext())
-					cSlice.next().set(cSlice0.next().getRealFloat() );
+					cSlice.next().setReal(cSlice0.next().getRealFloat() );
 						
-				Img<FloatType> imgSlice2;
+				Img< FloatType > imgSlice2;
 				if( upSample ){	
 					long[] outSize = new long[] {impSegmentationDisplay.getWidth(), impSegmentationDisplay.getHeight()};
 					imgSlice2 = Utils.upsample(imgSlice, outSize, Utils.Interpolator.NearestNeighbor);	
