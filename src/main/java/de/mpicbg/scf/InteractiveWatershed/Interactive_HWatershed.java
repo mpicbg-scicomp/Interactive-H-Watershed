@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import ij.IJ;
 import ij.ImageListener;
@@ -92,7 +93,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Seed dynamics", stepSize="0.05")
 	private Float hMin_log;
 	
-	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Intensity threshold")
+	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Intensity threshold", stepSize="0.05")
 	private Float thresh_log;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="peak flooding (in %)", min="0", max="100")
@@ -101,7 +102,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "Image", "Contour overlay", "Solid overlay" } )
 	private String displayStyle = "Image";
 	
-	@Parameter(label = "Slicing axis", style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "X", "Y", "Z" })
+	@Parameter(label = "Slicing axis", style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "X", "Y", "Z" }, persist = false)
 	private String slicingDirection = "Z";
 	
 	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE, persist = false) // persist is important otherwise it keep the value used previously independant what is set manually
@@ -117,7 +118,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	int[] pos= new int[] { 1, 1, 1};
 	double[] spacing = new double[] { 1, 1, 1};
-	int displayOrient = 2; // 2 is for display orient perpendicular to z direction
+	int displayOrient = -1; // 2 is for display orient perpendicular to z direction
 	LUT segLut;
 	LUT imageLut;
 	double[] segDispRange = new double[2];
@@ -145,10 +146,10 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	boolean upSample = true;
 	
+	boolean initDone = false;
 	
-	
-	
-	
+	boolean readyToFire = true;
+	boolean needUpdate = true;
 	
 	double[] displaySpacing;
 	
@@ -163,6 +164,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 
 	// -- Initializer methods --
 	protected void initialize_HWatershed() {	
+		if( initDone ){ return; }
 		
 		if (imp0 == null){
 			return;
@@ -232,7 +234,9 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		
 		// slicing direction
 		if( nDims==2){
+			System.out.println("test, slicingDirection "+ slicingDirection);
 			final MutableModuleItem<String> slicingItem = getInfo().getMutableInput("slicingDirection", String.class);
+			System.out.println("test, slicingDirection "+ slicingDirection);
 			getInfo().removeInput( slicingItem );
 		}
 		
@@ -261,25 +265,27 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		changed.put("displayOrient",	false);
 		//System.out.println(displayOrientString + " : "+ displayOrient);
 		
-		displayOrient = getDisplayOrient();
+		//displayOrient = getDisplayOrient();
 		previous = new HashMap<String,Double>();
-		previous.put("pos", 			(double)pos[displayOrient]);
+		previous.put("pos", 			(double)1);
 		previous.put("hMin", 			(double)getHMin());
 		previous.put("thresh", 			(double)getThresh());
 		previous.put("peakFlooding", 	(double)peakFlooding);
 		
 		
 		
-		// create the window to show the segmentation display
-		updateSegmentationDisplay();
 		
 		segmentTreeLabeler.updateTreeLabeling( getHMin() );
-		Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
+		Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, 2, 0);
 		imp_curSeg = ImageJFunctions.wrapFloat(img_currentSegmentation, "treeCut");
-		render();
+		
+		// create the window to show the segmentation display
+		//updateSegmentationDisplay();
+		//render();		
+		//preview();
 		
 		
-		
+		initDone = true;
 	} // end of the initialization! 
 	
 	
@@ -377,11 +383,30 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Override
 	public void preview(){
 		
-		
 		// check which parameter changed and update necessary value
 		if( !wasStateChanged() ){
 			return;
 		}
+		else{
+			needUpdate=true;
+		}
+		
+		
+		if( !readyToFire){
+			if( needUpdate ){ // wait 200 millisecond and try to preview again
+				try {
+					TimeUnit.MILLISECONDS.sleep(200);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				preview();
+			}
+			return;
+		}
+		readyToFire = false;
+		
+		
 		
 		
 		
@@ -417,7 +442,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		
 		render();	
 		
-		
+		readyToFire = true;
+		needUpdate = false;
 	}
 	
 	
@@ -440,20 +466,20 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			System.out.println("impSegmentationDisplay window :" + impSegmentationDisplay.getWindow().toString() );
 		}*/
 		
-		if( !(impSegmentationDisplay==null) ){
+		if( impSegmentationDisplay!=null ){
 			if (displayStyleOld.startsWith("Contour") | displayStyleOld.startsWith("Solid") ){
 				imageDispRange[0] = impSegmentationDisplay.getDisplayRangeMin();
 				imageDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
 				imageLut = (LUT) impSegmentationDisplay.getProcessor().getLut().clone();
 				
-				//System.out.println("image LUT: " + imageLut.toString() + "  ;  range: " + ArrayUtils.toString(imageDispRange) );
+				System.out.println("image LUT: " + imageLut.toString() + "  ;  range: " + ArrayUtils.toString(imageDispRange) );
 			}
 			else{
 				segDispRange[0] = impSegmentationDisplay.getDisplayRangeMin();
 				segDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
-				segLut = (LUT) imp_curSeg.getProcessor().getLut().clone();
+				segLut = (LUT) impSegmentationDisplay.getProcessor().getLut().clone();
 				
-				//System.out.println("seg LUT: " + segLut.toString() + "  ;  range: " + ArrayUtils.toString(segDispRange) );
+				System.out.println("update seg LUT: " + segLut.toString() + "  ;  range: " + ArrayUtils.toString(segDispRange) );
 			}
 		}
 		else{
@@ -619,7 +645,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			}	
 		};
 		
-		//ImagePlus.addImageListener(impListener); // not always satisfying  does not always register the
+		ImagePlus.addImageListener(impListener); // not always satisfying  does not always register the action
 		
 		
 		impSegmentationDisplay.getCanvas().addMouseMotionListener( this );
@@ -715,6 +741,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		}
 		
 		
+		//System.out.println("segLut: "+segLut.toString() );
 		
 		Overlay overlay = new Overlay();
 		ImagePlus imp_Contour= null;
@@ -728,6 +755,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			ImageCalculator ic = new ImageCalculator();
 			imp_Contour = ic.run("Subtract create", imp_curSeg_Dilate, imp_curSeg2);
 			
+			imp_Contour.setLut(segLut);
 			ImageRoi imageRoi = new ImageRoi(0,0, imp_Contour.getProcessor() );
 			imageRoi.setOpacity(0.75);
 			imageRoi.setZeroTransparent(true);
@@ -735,18 +763,21 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			overlay.add(imageRoi);
 			
 			//input_imp.setPosition(zSlice);
+			input_ip.setLut(imageLut);
 			impSegmentationDisplay.setProcessor( input_ip );
 			impSegmentationDisplay.setDisplayRange(imageDispRange[0], imageDispRange[1]);
 			
 		}
 		else if ( displayStyle.startsWith("Solid"))
 		{
+			ip_curSeg.setLut(segLut);
 			ImageRoi imageRoi = new ImageRoi(0,0, ip_curSeg );
 			imageRoi.setOpacity(0.5);
 			imageRoi.setZeroTransparent(true);
 			imageRoi.setPosition(pos[displayOrient]);
 			overlay.add(imageRoi);
-
+			
+			input_ip.setLut(imageLut);
 			impSegmentationDisplay.setProcessor( input_ip );
 			impSegmentationDisplay.setDisplayRange(imageDispRange[0], imageDispRange[1]);
 
@@ -784,8 +815,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		
 		exported_imp.setDimensions(1, zMax, 1);
 		exported_imp.setOpenAsHyperStack(true);
-		LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
-		exported_imp.setLut(segmentationLUT);
+		//LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
+		exported_imp.setLut(segLut);
 		exported_imp.setDisplayRange(0, nLabels, 0);
 		exported_imp.show();
 		
