@@ -910,7 +910,15 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			Overlay overlay = impSegmentationDisplay.getOverlay();
 			if ( overlay != null )
 				if(overlay.get(0) instanceof ImageRoi ){
-					int labelValue = imp_curSeg.getPixel( getXPix(e), getYPix(e) )[0];
+					float[] upSampleFactors;
+					if( upSample ){
+						double minDispSpacing = Math.min( displaySpacing[0], displaySpacing[1] );
+						upSampleFactors = new float[] {(float) (displaySpacing[0]/minDispSpacing) , (float) (displaySpacing[1]/minDispSpacing)};
+					}
+					else{
+						upSampleFactors = new float[] { 1f, 1f };
+					}
+					int labelValue = imp_curSeg.getPixel( (int)(((float)getXPix(e))/upSampleFactors[0]), (int)(((float)getYPix(e))/upSampleFactors[1]) )[0];
 					float labelValue2 = Float.intBitsToFloat(labelValue);
 					statusStr += ", label=" + labelValue2;
 				}
