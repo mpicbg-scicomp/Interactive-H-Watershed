@@ -1,8 +1,12 @@
 package de.mpicbg.scf.InteractiveWatershed;
 
+
 import ij.IJ;
 import ij.ImagePlus;
+
 import net.imglib2.Cursor;
+import net.imglib2.FinalInterval;
+import net.imglib2.RandomAccess;
 import net.imglib2.RealRandomAccess;
 import net.imglib2.img.Img;
 import net.imglib2.img.ImgFactory;
@@ -14,6 +18,9 @@ import net.imglib2.interpolation.randomaccess.NearestNeighborInterpolatorFactory
 import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.view.Views;
+
+import de.mpicbg.scf.imgtools.image.neighborhood.ImageConnectivity;
+
 
 public class Utils {
 
@@ -112,5 +119,90 @@ public class Utils {
 		return img;
 	}
 	
+	
+	
+	
+	public enum Connectivity
+	{
+		FACE(ImageConnectivity.Connectivity.FACE),
+		FULL(ImageConnectivity.Connectivity.FULL);
+		
+		ImageConnectivity.Connectivity conn;
+		
+		Connectivity(ImageConnectivity.Connectivity conn)
+		{			
+			this.conn = conn;
+		}
+		
+		ImageConnectivity.Connectivity getConn()
+		{
+			return conn;
+		}
+	}
+	
+	
+	public static <T extends RealType<T> & NativeType<T>> Img<T> getLabelContour(Img<T> input, Connectivity connectivity)
+	{
+		int nDim = input.numDimensions();
+		long[] dims = new long[nDim];
+		input.dimensions(dims);
+		Img<T> output = input.factory().create(dims, input.firstElement().createVariable() );
+		
+		//cursor on the extended input
+		long[] minInt = new long[ nDim ], maxInt = new long[ nDim ];
+		for ( int d = 0; d < nDim; ++d ){
+			minInt[ d ] = 0 ;    
+			maxInt[ d ] = dims[d] - 1 ;  
+		}
+		FinalInterval interval = new FinalInterval( minInt, maxInt );
+		RandomAccess<T> raIn = Views.interval( Views.extendMirrorSingle(input), interval ).randomAccess();
+		
+		// random accessible on the ouput
+		RandomAccess<T> raOut = output.randomAccess();
+		
+		// define the connectivity
+		long[][] neigh = ImageConnectivity.getConnectivityPos(nDim, connectivity.getConn() );
+		int[] n_offset = ImageConnectivity.getIdxOffsetToCenterPix(neigh, dims);
+		long[][] dPosList = ImageConnectivity.getSuccessiveMove(neigh);
+		int nNeigh = n_offset.length;
+		
+		// browse through the image
+		for(long idx=0; idx<input.size(); idx++){
+			
+			final long[] pos = new long[nDim];
+			getPosFromIdx( idx, pos, dims);
+			raIn.setPosition(pos);
+			float pVal = raIn.get().getRealFloat();
+			
+			if( pVal > 0 ){
+				
+				// loop on neighbors			
+				for( int i =0; i<nNeigh; i++){
+					
+					raIn.move(dPosList[i]);
+					float nVal = raIn.get().getRealFloat();
+					
+					// if n different from p then update ouput value
+					if ( nVal != pVal ) {
+						raOut.setPosition(pos);
+						raOut.get().setReal(pVal);
+						break;
+					}
+				}
+				
+			}
+		}
+		return output;
+	}
+	
+	
+	protected static void getPosFromIdx(long idx, long[] position, long[] dimensions)
+	{
+		for ( int i = 0; i < dimensions.length; i++ )
+		{
+			position[ i ] = ( int ) ( idx % dimensions[ i ] );
+			idx /= dimensions[ i ];
+		}
+	}
 	
 }

@@ -744,18 +744,22 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		//System.out.println("segLut: "+segLut.toString() );
 		
 		Overlay overlay = new Overlay();
-		ImagePlus imp_Contour= null;
 		if ( displayStyle.startsWith("Contour"))
 		{
-			
+			/*
 			Duplicator duplicator = new Duplicator();
 			ImagePlus imp_curSeg_Dilate = duplicator.run(imp_curSeg2);
 			
 			IJ.run(imp_curSeg_Dilate, "Maximum...", "radius=1");
 			ImageCalculator ic = new ImageCalculator();
 			imp_Contour = ic.run("Subtract create", imp_curSeg_Dilate, imp_curSeg2);
+			*/
 			
+			Img<FloatType> imgCurSeg2 = ImageJFunctions.wrapFloat( imp_curSeg2 );
+			Img<FloatType> imgContour = Utils.getLabelContour(imgCurSeg2, Utils.Connectivity.FACE );
+			ImagePlus imp_Contour = ImageJFunctions.wrap(imgContour, "segmentation Contour");
 			imp_Contour.setLut(segLut);
+			
 			ImageRoi imageRoi = new ImageRoi(0,0, imp_Contour.getProcessor() );
 			imageRoi.setOpacity(0.75);
 			imageRoi.setZeroTransparent(true);
