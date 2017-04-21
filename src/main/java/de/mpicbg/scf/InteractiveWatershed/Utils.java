@@ -149,13 +149,13 @@ public class Utils {
 		Img<T> output = input.factory().create(dims, input.firstElement().createVariable() );
 		
 		//cursor on the extended input
-		long[] minInt = new long[ nDim ], maxInt = new long[ nDim ];
-		for ( int d = 0; d < nDim; ++d ){
-			minInt[ d ] = 0 ;    
-			maxInt[ d ] = dims[d] - 1 ;  
-		}
-		FinalInterval interval = new FinalInterval( minInt, maxInt );
-		RandomAccess<T> raIn = Views.interval( Views.extendMirrorSingle(input), interval ).randomAccess();
+		//long[] minInt = new long[ nDim ], maxInt = new long[ nDim ];
+		//for ( int d = 0; d < nDim; ++d ){
+		//	minInt[ d ] = 0 ;    
+		//	maxInt[ d ] = dims[d] - 1 ;  
+		//}
+		//FinalInterval interval = new FinalInterval( minInt, maxInt );
+		RandomAccess<T> raIn = Views.extendMirrorSingle(input).randomAccess();
 		
 		// random accessible on the ouput
 		RandomAccess<T> raOut = output.randomAccess();
