@@ -427,7 +427,10 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		}
 		else if( changed.get("hMin") )
 		{
-			segmentTreeLabeler.updateTreeLabeling( getHMin() );
+			boolean makeNewLabels = true ; 
+			int nLabels = segmentTreeLabeler.updateTreeLabeling( getHMin() , makeNewLabels );
+			segDispRange[0] = 0;
+			segDispRange[1] = nLabels;
 			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
 			RandomAccessibleInterval<IntType> rai_currentSegmentation =  Views.dropSingletonDimensions(img_currentSegmentation);
 			
@@ -686,6 +689,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			imp_curSeg2 = imp_curSeg;
 		}
 		imp_curSeg.getProcessor().setLut(segLut);
+		imp_curSeg2.setDisplayRange( segDispRange[0], segDispRange[1]); 
 		ImageProcessor ip_curSeg  = imp_curSeg2.getProcessor();
 		ip_curSeg.setLut( segLut );
 		
@@ -759,6 +763,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			Img<FloatType> imgContour = Utils.getLabelContour(imgCurSeg2, Utils.Connectivity.FACE );
 			ImagePlus imp_Contour = ImageJFunctions.wrap(imgContour, "segmentation Contour");
 			imp_Contour.setLut(segLut);
+			imp_Contour.setDisplayRange( segDispRange[0], segDispRange[1]);
 			
 			ImageRoi imageRoi = new ImageRoi(0,0, imp_Contour.getProcessor() );
 			imageRoi.setOpacity(0.75);
