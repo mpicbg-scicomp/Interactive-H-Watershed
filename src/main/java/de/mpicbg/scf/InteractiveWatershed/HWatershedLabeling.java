@@ -14,6 +14,8 @@ import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
 import de.mpicbg.scf.imgtools.image.create.image.ImagePlusImgConverter;
 import de.mpicbg.scf.imgtools.image.create.labelmap.LocalMaximaLabeling;
 import de.mpicbg.scf.imgtools.image.neighborhood.ImageConnectivity;
+import de.mpicbg.scf.imgtools.ui.visualisation.ProgressDialog;
+
 import net.imglib2.Cursor;
 import net.imglib2.FinalInterval;
 import net.imglib2.RandomAccess;
@@ -34,8 +36,7 @@ import net.imglib2.view.Views;
  * 
  * Remark: the input image is duplicated and will not be modified during the process 
  * 
- * todo:
- *  - clean the class, check usability of getter, setter, constructor, move the plugin specific part to the plugin
+ * ideas:
  *  - check for the possibility to build a tree from seeds and list the required change (for instance to ensure Imin, Imax, and dynamics are properly calculated)
  *  - explore the possibility to separate watershed and segment hierarchy (to gain speed with the watershed and flexibility for hierarchy construction)
  * 
@@ -131,7 +132,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 	private Connectivity connectivity;
 	private boolean maxTreeIsBuilt=false;
 	private Tree maxTree;
-	
+	private boolean  wasCancelled=false;
 	
 	
 	public HWatershedLabeling(Img<T> input, float threshold, Connectivity connectivity)
@@ -464,8 +465,15 @@ public class HWatershedLabeling<T extends RealType<T>> {
 	
 	protected void createMaxTree2()
 	{
-		if ( maxTreeIsBuilt )
+		if ( maxTreeIsBuilt | wasCancelled)
 			return;
+		
+		ProgressDialog.reset();
+		
+		//////////////////////////////////////////////////////////////////////
+		// initialisation ////////////////////////////////////////////////////
+		ProgressDialog.setStatusText("HWatershed: Initialisation");
+		ProgressDialog.setProgress( 0 );
 		
 		IntType Tmin = labelMapMaxTree.randomAccess().get().createVariable();
 		IntType Tmax = Tmin.createVariable();		
@@ -510,6 +518,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		
 		// fill the queue
 		int idx=-1;
+		int pixToProcessCount = 0;
 		while( input_cursor.hasNext() )
 		{
 			++idx;
@@ -518,6 +527,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			float valSeed = seed_cursor.next().getRealFloat(); 
 			if ( pVal>=min)
 			{
+				pixToProcessCount++;
 				if ( valSeed>0)
 				{
 					Q.add( idx, (int)pVal );
@@ -548,10 +558,33 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		boolean[] isDequeued = new boolean[(int)labelMapMaxTree.size()];
 		for (int i=0; i<isDequeued.length; i++)
 			isDequeued[i]=false;
-			
+		
+		/////////////////////////////////////////////////////////////////////////////////////
+		// building the watershed and the tree //////////////////////////////////////////////
+		ProgressDialog.setStatusText("HWatershed: building label map and segment tree");
+		
 		int newNode = nLeaves;
+		int pixProcessed = 0;
+		int prevPercentDone = 0;
 		while( Q.HasNext() )
 		{ 	
+			
+			pixProcessed++;
+			final int percentDone = (pixProcessed*100)/pixToProcessCount;
+			if( percentDone != prevPercentDone ){
+				prevPercentDone = percentDone;
+				ProgressDialog.setProgress( percentDone*0.01f );
+				if (ProgressDialog.wasCancelled())
+				{
+					labelMapMaxTree=null;
+					maxTree = null;
+					ProgressDialog.reset();
+					ProgressDialog.finish();
+					wasCancelled=true;
+					return;
+				}
+			}
+			
 			
 			final int pIdx = (int) Q.Next(); 
 			final int pVal = Q.getCurrent_level() + Q.getMin();
@@ -686,6 +719,11 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			}
 		}
 		
+		//////////////////////////////////////////////////////////////////////////////////
+		// final pass on the label image /////////////////////////////////////////////////
+		ProgressDialog.setStatusText("HWatershed: final pass");
+		
+		
 		// convert the input to label image (label L is stored in input with value min-1-L all other value should be equal to min-1 )
 		final IntType minT = labelMapMaxTree.firstElement().createVariable();
         minT.setReal(min-1);
@@ -714,6 +752,8 @@ public class HWatershedLabeling<T extends RealType<T>> {
         
         maxTreeIsBuilt=true;
         
+        ProgressDialog.finish();
+        wasCancelled=false;
         return;
         // at the end, input was tranformed to a label image
         // hCriteria contains the dynamics of each peak

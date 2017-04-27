@@ -151,6 +151,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	boolean readyToFire = true;
 	boolean needUpdate = true;
 	
+	boolean initInterupted = false;
+	
 	double[] displaySpacing;
 	
 	// -- Command methods --
@@ -191,7 +193,19 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		HWatershedLabeling<FloatType> segmentTreeConstructor = new HWatershedLabeling<FloatType>(input, threshold, Connectivity.FACE);
 		Tree hSegmentTree = segmentTreeConstructor.getTree();
 		Img<IntType> hSegmentMap = segmentTreeConstructor.getLabelMapMaxTree();
+		if ( hSegmentMap==null ){
+			initInterupted=true;
+			IJ.error("H-Watershed construction was manually interupted, please close the interactive watershed dialog.");
+			
+			// initialize analyzed image name  ////////////////////// 
+			analyzedImageName = "Initialisation was interupted, please close the plugin.";
+			final MutableModuleItem<String> AnalyzedImageItem = getInfo().getMutableInput("analyzedImageName", String.class);
+			AnalyzedImageItem.setValue(this, analyzedImageName );
+			
+			return;
+		}
 		segmentTreeLabeler = new SegmentHierarchyToLabelMap<FloatType>( hSegmentTree, hSegmentMap, input );
+		
 		
 		
 
@@ -384,6 +398,9 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	public void preview(){
 		
 		// check which parameter changed and update necessary value
+		if( initInterupted ){
+			return;
+		}
 		if( !wasStateChanged() ){
 			return;
 		}
@@ -809,6 +826,10 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	protected void exportButton_callback(){
 		
+		if( initInterupted ){
+			return;
+		}
+			
 		boolean makeNewLabels = true ; 
 		double hMin = previous.get("hMin");
 		double thresh = previous.get("thresh");
