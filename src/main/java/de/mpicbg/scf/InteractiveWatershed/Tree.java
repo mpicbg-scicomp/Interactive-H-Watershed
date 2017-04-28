@@ -159,6 +159,7 @@ public class Tree {
 		List<Node> children;
 		boolean flag= false;
 		float decoration=0;
+		int labelRoot = 0;
 		
 		public float getDecoration() {
 			return decoration;

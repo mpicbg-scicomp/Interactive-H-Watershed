@@ -10,14 +10,14 @@ import ij.IJ;
 import ij.ImagePlus;
 import de.mpicbg.scf.InteractiveWatershed.HierarchicalFIFO;
 import de.mpicbg.scf.InteractiveWatershed.Tree;
-import de.mpicbg.scf.InteractiveWatershed.TreeLabeling;
 import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
 import de.mpicbg.scf.imgtools.image.create.image.ImagePlusImgConverter;
 import de.mpicbg.scf.imgtools.image.create.labelmap.LocalMaximaLabeling;
 import de.mpicbg.scf.imgtools.image.neighborhood.ImageConnectivity;
+import de.mpicbg.scf.imgtools.ui.visualisation.ProgressDialog;
+
 import net.imglib2.Cursor;
 import net.imglib2.FinalInterval;
-import net.imglib2.IterableInterval;
 import net.imglib2.RandomAccess;
 import net.imglib2.algorithm.stats.ComputeMinMax;
 import net.imglib2.exception.IncompatibleTypeException;
@@ -35,15 +35,12 @@ import net.imglib2.view.Views;
  * 2016/07/05: First implementation of the max tree  
  * 
  * Remark: the input image is duplicated and will not be modified during the process 
- * Remark: the input type should be able to represent the number of nodes of the tree number (2 time the number of maxima in input minus one) 
  * 
- * todo:
- *  - clean the class, check usability of getter, setter, constructor, move the plugin specific part to the plugin
+ * ideas:
  *  - check for the possibility to build a tree from seeds and list the required change (for instance to ensure Imin, Imax, and dynamics are properly calculated)
  *  - explore the possibility to separate watershed and segment hierarchy (to gain speed with the watershed and flexibility for hierarchy construction)
- *  - Multithread tree and image relabeling (to keep some interactivity with very large plane)
- *		+ Remark: what is the bottleneck? tree labeling or image labeling, something else?
- * @param <T>
+ * 
+ *  @param <T>
  */
 
 
@@ -130,33 +127,23 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		}
 	}
 	
-	
-	
-	//private double[] hCriteria; // to be initialized at 0
-	//private float[] Imax; // to be initialized at 0
-	//private int[] parent; // to be initialized at minus one (rk it could contain Icriteria which is needed only before parent definition)
-	//private int[][] children;
-	private Img<T> input;
 	private Img<IntType> labelMapMaxTree;
 	private float threshold;
 	private Connectivity connectivity;
 	private boolean maxTreeIsBuilt=false;
-	//private int nLeaves=0;
 	private Tree maxTree;
-	
+	private boolean  wasCancelled=false;
 	
 	
 	public HWatershedLabeling(Img<T> input, float threshold, Connectivity connectivity)
 	{
 		int nDims = input.numDimensions();
 		long[] dims = new long[nDims];
-		this.input = input;
 		input.dimensions(dims);
 		ImgFactory<IntType> imgFactoryIntType=null;
 		try {
 			imgFactoryIntType = input.factory().imgFactory( new IntType() );
 		} catch (IncompatibleTypeException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -171,7 +158,6 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			}
 		}
 		
-		//this.labelMapmaxTree = input.copy();
 		this.threshold = threshold;
 		this.connectivity = connectivity;
 	}
@@ -185,20 +171,13 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		return maxTree;
 	}
 
-	/*public int[] getParents() {
-		createMaxTree();
-		return parent;
-	}*/
-
 	public Img<IntType> getLabelMapMaxTree() {
 		createMaxTree2();
 		return labelMapMaxTree;
 	}
 
 
-	//public Img<IntType> labelMapDebug; // debug only
-
-	
+	@Deprecated
 	protected void createMaxTree()
 	{
 		if ( maxTreeIsBuilt )
@@ -486,8 +465,15 @@ public class HWatershedLabeling<T extends RealType<T>> {
 	
 	protected void createMaxTree2()
 	{
-		if ( maxTreeIsBuilt )
+		if ( maxTreeIsBuilt | wasCancelled)
 			return;
+		
+		ProgressDialog.reset();
+		
+		//////////////////////////////////////////////////////////////////////
+		// initialisation ////////////////////////////////////////////////////
+		ProgressDialog.setStatusText("HWatershed: Initialisation");
+		ProgressDialog.setProgress( 0 );
 		
 		IntType Tmin = labelMapMaxTree.randomAccess().get().createVariable();
 		IntType Tmax = Tmin.createVariable();		
@@ -532,6 +518,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		
 		// fill the queue
 		int idx=-1;
+		int pixToProcessCount = 0;
 		while( input_cursor.hasNext() )
 		{
 			++idx;
@@ -540,6 +527,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			float valSeed = seed_cursor.next().getRealFloat(); 
 			if ( pVal>=min)
 			{
+				pixToProcessCount++;
 				if ( valSeed>0)
 				{
 					Q.add( idx, (int)pVal );
@@ -570,10 +558,33 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		boolean[] isDequeued = new boolean[(int)labelMapMaxTree.size()];
 		for (int i=0; i<isDequeued.length; i++)
 			isDequeued[i]=false;
-			
+		
+		/////////////////////////////////////////////////////////////////////////////////////
+		// building the watershed and the tree //////////////////////////////////////////////
+		ProgressDialog.setStatusText("HWatershed: building label map and segment tree");
+		
 		int newNode = nLeaves;
+		int pixProcessed = 0;
+		int prevPercentDone = 0;
 		while( Q.HasNext() )
 		{ 	
+			
+			pixProcessed++;
+			final int percentDone = (pixProcessed*100)/pixToProcessCount;
+			if( percentDone != prevPercentDone ){
+				prevPercentDone = percentDone;
+				ProgressDialog.setProgress( percentDone*0.01f );
+				if (ProgressDialog.wasCancelled())
+				{
+					labelMapMaxTree=null;
+					maxTree = null;
+					ProgressDialog.reset();
+					ProgressDialog.finish();
+					wasCancelled=true;
+					return;
+				}
+			}
+			
 			
 			final int pIdx = (int) Q.Next(); 
 			final int pVal = Q.getCurrent_level() + Q.getMin();
@@ -676,19 +687,6 @@ public class HWatershedLabeling<T extends RealType<T>> {
 									else
 										HMerge = Math.min( hCriteria[children[parent[node2]][0]], hCriteria[children[parent[node2]][1]] );
 								}
-								
-								/*
-								int par2 = parent[node2]; 
-								while( (hCriteria[par2] <= H1)  )
-								{	
-									node2 = par2;
-									par2 = parent[node2];
-								
-								}
-								*/
-
-								//while( hCriteria[node2] <= H1 )
-								//	node2 = parent[node2];
 							}
 							mergeNodes(node1, node2, newNode, parent, children);
 							pNode=findRoot(newNode, parent);
@@ -721,6 +719,11 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			}
 		}
 		
+		//////////////////////////////////////////////////////////////////////////////////
+		// final pass on the label image /////////////////////////////////////////////////
+		ProgressDialog.setStatusText("HWatershed: final pass");
+		
+		
 		// convert the input to label image (label L is stored in input with value min-1-L all other value should be equal to min-1 )
 		final IntType minT = labelMapMaxTree.firstElement().createVariable();
         minT.setReal(min-1);
@@ -749,6 +752,8 @@ public class HWatershedLabeling<T extends RealType<T>> {
         
         maxTreeIsBuilt=true;
         
+        ProgressDialog.finish();
+        wasCancelled=false;
         return;
         // at the end, input was tranformed to a label image
         // hCriteria contains the dynamics of each peak
@@ -771,7 +776,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			}
 		}
 							
-		// update children of parent(node1) if needed
+		// update children of parent(node2) if needed
 		int par2 = parent[node2];
 		if( par2 != node2){ // node2 is not a root
 			for(int i=0; i<2; i++){
@@ -813,120 +818,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		}
 	}
 	
-
-	public Img<IntType>  getHFlooding(float hMin, float globalThreshold, float peakFloodingPercent)
-	{
-		int[] nodeIdToLabel = getTreeLabeling( hMin );
 		
-		Img<IntType> labelMap = createLabelMap_forTheTreeLabeling(labelMapMaxTree.copy(), input, nodeIdToLabel, globalThreshold, peakFloodingPercent);
-		
-		return labelMap;
-	}
-	
-
-	public Img<IntType>  getHFlooding(float hMin, float globalThreshold, float peakFloodingPercent, int Z)
-	{
-		int nDims = labelMapMaxTree.numDimensions();
-			
-		Img<IntType> labelMapHyperSlice;
-		IterableInterval<T> inputHyperslice;
-		if (nDims>2)
-		{	
-			long[] dimensions = new long[nDims];
-			labelMapMaxTree.dimensions(dimensions);
-			long[] newDimensions = new long[nDims];
-			for ( int d = 0; d < nDims; ++d )
-			{
-				if(d<2)
-					newDimensions[d] = dimensions[d];
-				else
-					newDimensions[d] = 1;
-			}
-			labelMapHyperSlice = labelMapMaxTree.factory().create(newDimensions, labelMapMaxTree.firstElement());
-			Cursor<IntType> cursor = labelMapHyperSlice.cursor();
-			Cursor<IntType> cursor0 = Views.hyperSlice(labelMapMaxTree, 2, Z).cursor();
-			
-			while ( cursor.hasNext() )
-				cursor.next().set( cursor0.next().get() );
-			
-			inputHyperslice =  (IterableInterval<T>) Views.hyperSlice(input, 2, Z);
-		}
-		else{
-			labelMapHyperSlice = labelMapMaxTree.copy();
-			inputHyperslice = input;
-		}
-		
-		int[] nodeIdToLabel = getTreeLabeling( hMin );
-		
-		Img<IntType> labelMap = createLabelMap_forTheTreeLabeling( labelMapHyperSlice, inputHyperslice, nodeIdToLabel, globalThreshold, peakFloodingPercent);
-		
-		return labelMap;
-	}
-
-	
-	public int[] getTreeLabeling( float hMin )
-	{
-		createMaxTree2();
-		
-		boolean[] nodeSelection = new boolean[maxTree.getNumNodes()];
-		double[] dynamics = maxTree.getFeature("dynamics");
-		
-		for( int nodeId=0; nodeId<maxTree.getNumNodes(); nodeId++ )
-			nodeSelection[nodeId] = (dynamics[nodeId]>hMin);
-		
-		TreeLabeling treeLabeler = new TreeLabeling(maxTree);
-		int[] nodeIdToLabel =  treeLabeler.getNodeIdToLabel_LUT(nodeSelection, TreeLabeling.Rule.MAX );
-		
-		return nodeIdToLabel;
-	}
-	
-	
-	public <U extends RealType<U>> Img<U> createLabelMap_forTheTreeLabeling(Img<U> labelMap, IterableInterval<T> inputIntensity, int[] nodeToLabel, float globalThreshold, float peakFloodingPercent)
-	{
-		
-		createMaxTree2();
-		
-		double[] Imax = maxTree.getFeature("Imax");
-		
-		int nNode = Imax.length;
-		float[] peakThresholds = new float[nNode];
-		for(int i=0;i<nNode; i++)
-			peakThresholds[i] =  globalThreshold + ((float)Imax[i]-globalThreshold)*(1-peakFloodingPercent/100);
-		
-		Cursor<U> cursor = labelMap.cursor();
-		Cursor<T> cursorImg = inputIntensity.cursor();
-		while( cursor.hasNext() )
-		{
-			T imgPixel = cursorImg.next();
-			float val =imgPixel.getRealFloat();
-			
-			U pixel = cursor.next();
-			int node = (int)pixel.getRealFloat();
-			int label = nodeToLabel[node];
-			
-			if(  val >= globalThreshold )
-			{
-				if(  val >= peakThresholds[label]  )
-				{	
-					float finalVal = (float)label;
-					pixel.setReal( finalVal );
-				}
-				else
-					pixel.setReal( 0.0 );
-			}
-			else
-				pixel.setReal( 0.0 );
-		}
-		return labelMap;
-	}
-	
-	
-	
-	
-	
-	
-	
-	
 	
 
 	
