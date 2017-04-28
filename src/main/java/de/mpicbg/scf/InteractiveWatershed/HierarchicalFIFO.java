@@ -16,7 +16,8 @@ public class HierarchicalFIFO {
 		return min;
 	}
 
-	private final int min, max;
+	private final int min;
+	//private final int max;
 	private int max_level;
 	private ArrayList<LinkedList<Integer>> QueueList; 
 	
@@ -28,7 +29,7 @@ public class HierarchicalFIFO {
 		for(int i=0; i<nbin; i++)
 			QueueList.add( new LinkedList<Integer>() );
 		this.min = min;
-		this.max = max;
+		//this.max = max;
 		this.max_level = nbin-1;
 		current_level = max_level;
 	}

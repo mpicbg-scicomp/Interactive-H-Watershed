@@ -5,7 +5,6 @@ import ij.IJ;
 import ij.ImagePlus;
 
 import net.imglib2.Cursor;
-import net.imglib2.FinalInterval;
 import net.imglib2.RandomAccess;
 import net.imglib2.RealRandomAccess;
 import net.imglib2.img.Img;

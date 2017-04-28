@@ -1,17 +1,9 @@
 package de.mpicbg.scf.InteractiveWatershed;
 
 
-import java.util.Arrays;
-import java.util.Map;
-
-
-
-import ij.IJ;
-import ij.ImagePlus;
 import de.mpicbg.scf.InteractiveWatershed.HierarchicalFIFO;
 import de.mpicbg.scf.InteractiveWatershed.Tree;
-import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
-import de.mpicbg.scf.imgtools.image.create.image.ImagePlusImgConverter;
+
 import de.mpicbg.scf.imgtools.image.create.labelmap.LocalMaximaLabeling;
 import de.mpicbg.scf.imgtools.image.neighborhood.ImageConnectivity;
 import de.mpicbg.scf.imgtools.ui.visualisation.ProgressDialog;
@@ -25,7 +17,6 @@ import net.imglib2.img.Img;
 import net.imglib2.img.ImgFactory;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
-import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.view.Views;
 
 
@@ -824,6 +815,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 	
 	public static void main(final String... args)
 	{
+		/*
 		// image to flood
 		new ij.ImageJ();
 		//IJ.open("F:\\projects\\blobs.tif");
@@ -873,7 +865,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 		//Arrays.sort(attributes2);
 		for( float val : attributes2 )
 		{
-			/*
+			
 			float h= val;
 			Img<IntType> hMax = maxTreeConstructor.getHFlooding2(h);
 			ImagePlus imp_hMax = impImgConverter.getImagePlus(hMax);
@@ -881,10 +873,10 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			imp_hMax.show();
 			IJ.run(imp_hMax, "3-3-2 RGB", "");
 			IJ.setMinAndMax(imp_hMax, 0, parents.length);
-			*/
+			
 		}
 		
-		
+		*/
 		
 		
 	}
