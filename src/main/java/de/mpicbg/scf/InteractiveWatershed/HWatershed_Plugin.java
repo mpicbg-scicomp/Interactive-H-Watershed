@@ -46,7 +46,7 @@ import org.scijava.plugin.Plugin;
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
 
-@Plugin(type = Op.class, name="H-Watershed", menuPath = "SCF>Labeling>H-Watershed", headless = true, label="H-Watershed", visible=true)
+@Plugin(type = Op.class, name="H_Watershed", menuPath = "SCF>Labeling>H_Watershed", headless = true, label="H_Watershed", visible=true)
 public class HWatershed_Plugin extends AbstractOp  {
 
 	

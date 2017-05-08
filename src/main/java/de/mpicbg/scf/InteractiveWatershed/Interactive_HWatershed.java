@@ -94,7 +94,7 @@ import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
  * known issue: the input harvester cannot be refreshed => view image list is not updated
  * 
  */
-@Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive H-Watershed", initializer="initialize_HWatershed", headless = true, label="Interactive H-Watershed")
+@Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive H_Watershed", initializer="initialize_HWatershed", headless = true, label="Interactive H_Watershed")
 public class Interactive_HWatershed extends InteractiveCommand implements Previewable, MouseMotionListener {
 
 	// -- Parameters --
@@ -868,11 +868,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		Recorder recorder =  Recorder.getInstance();  
 		if( recorder != null ){
 			if( !Recorder.scriptMode() ){
-				Recorder.record("run","H-Watershed", "impin=[" + imp0.getTitle() + "] hmin=" + hMin + " thresh=" + thresh + " peakflooding=" + peakFlooding);
+				Recorder.record("run","H_Watershed", "impin=[" + imp0.getTitle() + "] hmin=" + hMin + " thresh=" + thresh + " peakflooding=" + peakFlooding);
 			}
 			else{
-				Recorder.recordCall("# @ImageJ ij");
-				Recorder.recordCall("impOUT = ij.op().run(\"H-Watershed\", impIn, "+hMin+", "+thresh+", "+peakFlooding+")");
+				Recorder.recordCall("# @ImagePlus impIN");
+				Recorder.recordCall("# @OpService ops");
+				Recorder.recordCall("# @OUTPUT ImagePlus impOUT");
+				
+				Recorder.recordCall("impOUT = ops.run(\"H_Watershed\", impIN, "+hMin+", "+thresh+", "+peakFlooding+")");
 			}
 		}
 		
