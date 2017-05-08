@@ -1,5 +1,7 @@
 
-hMin = 500;
-thresh = 500;
-peakFlooding = 80;
-run("HWatershed", "impin=2DEmbryoSection_Mette.tif hmin="+hMin+" thresh="+thresh+" peakflooding="+peakFlooding);
+
+
+hMin = 20;
+thresh = 100;
+peakFlooding = 90;
+run("H_Watershed", "impin="+getTitle()+" hmin="+hMin+" thresh="+thresh+" peakflooding="+peakFlooding);

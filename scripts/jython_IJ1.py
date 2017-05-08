@@ -1,7 +1,8 @@
-
 from ij import IJ
 
-hMin = 500;
-thresh = 500;
-peakFlooding = 80;
-IJ.run("HWatershed", "impin=2DEmbryoSection_Mette.tif hmin="+str(hMin)+" thresh="+str(thresh)+" peakflooding="+str(peakFlooding));
+imp = IJ.getImage()
+hMin = 20;
+thresh = 100;
+peakFlooding = 90;
+
+IJ.run("H_Watershed", "impin="+imp.getTitle()+" hmin="+str(hMin)+" thresh="+str(thresh)+" peakflooding="+str(peakFlooding));

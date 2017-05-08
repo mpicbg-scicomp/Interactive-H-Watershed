@@ -2,7 +2,9 @@
 # @OpService ops
 # @OUTPUT ImagePlus result
 
-hMin = 500
-thresh = 500
-peakFlooding = 80
-result = ops.run("HWatershed", imp, hMin, thresh, peakFlooding );
+hMin = 20
+thresh = 100
+peakFlooding = 90
+result = ops.run("H_Watershed", imp, hMin, thresh, peakFlooding )
+
+
