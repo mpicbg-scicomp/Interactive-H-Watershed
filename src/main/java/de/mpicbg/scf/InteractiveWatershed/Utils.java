@@ -42,7 +42,7 @@ import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.view.Views;
 
-import de.mpicbg.scf.imgtools.image.neighborhood.ImageConnectivity;
+import de.mpicbg.scf.InteractiveWatershed.imgTools.ImageConnectivity;
 
 
 public class Utils {

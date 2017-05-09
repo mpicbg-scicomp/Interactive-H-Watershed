@@ -29,9 +29,9 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 import de.mpicbg.scf.InteractiveWatershed.HierarchicalFIFO;
 import de.mpicbg.scf.InteractiveWatershed.Tree;
 
-import de.mpicbg.scf.imgtools.image.create.labelmap.LocalMaximaLabeling;
-import de.mpicbg.scf.imgtools.image.neighborhood.ImageConnectivity;
-import de.mpicbg.scf.imgtools.ui.visualisation.ProgressDialog;
+import de.mpicbg.scf.InteractiveWatershed.imgTools.LocalMaximaLabeling;
+import de.mpicbg.scf.InteractiveWatershed.imgTools.ImageConnectivity;
+import de.mpicbg.scf.InteractiveWatershed.imgTools.ProgressDialog;
 
 import net.imglib2.Cursor;
 import net.imglib2.FinalInterval;

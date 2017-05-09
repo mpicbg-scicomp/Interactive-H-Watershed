@@ -91,10 +91,9 @@
         </dependency>
 
         <dependency>
-            <groupId>de.mpicbg.scf</groupId>
-            <artifactId>SCF_ImgTools</artifactId>
-            <version>1.1.0</version>
-        </dependency>
+			<groupId>net.imagej</groupId>
+			<artifactId>imagej</artifactId>
+		</dependency>
 
     </dependencies>
 
