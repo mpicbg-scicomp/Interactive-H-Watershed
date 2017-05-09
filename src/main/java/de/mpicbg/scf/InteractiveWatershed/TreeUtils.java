@@ -89,7 +89,7 @@ public class TreeUtils {
 	 * Helper function findings the most root node of each label 
 	 * i.e. right above the cut (and with not parent right above the cut value)
 	 * the approach assumes node feature is decreasing from root to leafs   
-	 * @param tree
+	 * @param tree : a tree
 	 * @param feature node attributes on which the tree cut is determined
 	 * @param cut any node below that value is merged with its parent
 	 * @return return a list of the most root node for each label right above the cut ()the most root nodes with a child below the cut
@@ -148,7 +148,7 @@ public class TreeUtils {
 	
 	/**
 	 * Label all the nodes below the seed according to seed ID	
-	 * @param tree
+	 * @param tree : a tree
 	 * @param labelSeeds list of most root node for each label
 	 * @return an array matching node Id to a label
 	 */

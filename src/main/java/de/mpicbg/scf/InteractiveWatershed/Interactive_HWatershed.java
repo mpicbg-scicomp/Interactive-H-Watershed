@@ -69,7 +69,6 @@ import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.view.Views;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.scijava.command.Command;
 import org.scijava.command.InteractiveCommand;
 import org.scijava.command.Previewable;
@@ -88,10 +87,7 @@ import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 /**
  * An plugin allowing to explore the watershed from hMaxima 
  * 
- * Todo:
- *  - see googleDrive document
- *  
- * known issue: the input harvester cannot be refreshed => view image list is not updated
+ * known issue: the input harvester cannot be refreshed : view image list is not updated
  * 
  */
 @Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive H_Watershed", initializer="initialize_HWatershed", headless = true, label="Interactive H_Watershed")
@@ -505,14 +501,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				imageDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
 				imageLut = (LUT) impSegmentationDisplay.getProcessor().getLut().clone();
 				
-				System.out.println("image LUT: " + imageLut.toString() + "  ;  range: " + ArrayUtils.toString(imageDispRange) );
+				System.out.println("image LUT: " + imageLut.toString() + "  ;  range: " + Arrays.toString(imageDispRange) );
 			}
 			else{
 				segDispRange[0] = impSegmentationDisplay.getDisplayRangeMin();
 				segDispRange[1] = impSegmentationDisplay.getDisplayRangeMax();
 				segLut = (LUT) impSegmentationDisplay.getProcessor().getLut().clone();
 				
-				System.out.println("update seg LUT: " + segLut.toString() + "  ;  range: " + ArrayUtils.toString(segDispRange) );
+				System.out.println("update seg LUT: " + segLut.toString() + "  ;  range: " + Arrays.toString(segDispRange) );
 			}
 		}
 		else{
@@ -905,7 +901,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		
 		
 		// Launch the command .
-		IJ.openImage("F:\\projects\\2DEmbryoSection_Mette.tif").show();
+		IJ.openImage("F:\\projects\\2DPlatynereis.tif").show();
 		//Dataset dataset = (Dataset) ij.io().open("F:\\projects\\2DEmbryoSection_Mette.tif");
 		//Dataset dataset2 = (Dataset) ij.io().open("F:\\projects\\2D_8peaks.tif");
 		//ij.ui().show(dataset);

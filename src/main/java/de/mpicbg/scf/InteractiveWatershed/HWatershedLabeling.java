@@ -45,15 +45,7 @@ import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.view.Views;
 
 
-/**
- * 
- * @author Lombardot Benoit, Scientific Computing Facility, MPI-CBG, Dresden
- * 2016/07/05: First implementation of the max tree  
- * 
- * Remark: the input image is duplicated and will not be modified during the process 
- * 
- *  @param <T>
- */
+
 
 
 public class HWatershedLabeling<T extends RealType<T>> {
