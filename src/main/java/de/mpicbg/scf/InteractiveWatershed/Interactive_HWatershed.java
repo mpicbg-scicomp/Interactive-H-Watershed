@@ -853,7 +853,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		double thresh = previous.get("thresh");
 		double peakFlooding = previous.get("peakFlooding");
 		
-		int nLabels = segmentTreeLabeler.updateTreeLabeling( (float)hMin , makeNewLabels);
+		segmentTreeLabeler.updateTreeLabeling( (float)hMin , makeNewLabels);
 		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)thresh , (float)peakFlooding);
 
 		IntType minPixel = new IntType();
@@ -871,7 +871,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		exported_imp.setOpenAsHyperStack(true);
 		//LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
 		exported_imp.setLut(segLut);
-		exported_imp.setDisplayRange(0, nLabels, 0);
+		exported_imp.setDisplayRange(0,  maxPixel.get(), 0);
 		exported_imp.show();
 		
 		Recorder recorder =  Recorder.getInstance();  

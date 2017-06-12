@@ -32,10 +32,13 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.plugin.LutLoader;
 import ij.process.LUT;
+import net.imagej.ImageJ;
 import net.imagej.ops.AbstractOp;
 import net.imagej.ops.Op;
+import net.imglib2.algorithm.stats.ComputeMinMax;
 import net.imglib2.img.Img;
 import net.imglib2.img.display.imagej.ImageJFunctions;
+import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
 
@@ -49,7 +52,6 @@ import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 @Plugin(type = Op.class, name="H_Watershed", menuPath = "SCF>Labeling>H_Watershed", headless = true, label="H_Watershed", visible=true)
 public class HWatershed_Plugin extends AbstractOp  {
 
-	
 	
 	// -- Parameters --
 	@Parameter (type = ItemIO.INPUT)
@@ -82,7 +84,8 @@ public class HWatershed_Plugin extends AbstractOp  {
 		}
 		
 		// build the segment tree
-		HWatershedLabeling<FloatType> segmentTreeConstructor = new HWatershedLabeling<FloatType>(imgIN, thresh, Connectivity.FACE);
+		float threshold0 = Float.NEGATIVE_INFINITY; // we will flood the whole image in the first place
+		HWatershedLabeling<FloatType> segmentTreeConstructor = new HWatershedLabeling<FloatType>(imgIN, threshold0 , Connectivity.FACE);
 		Tree hSegmentTree = segmentTreeConstructor.getTree();
 		
 		// segment tree to label map  
@@ -90,11 +93,16 @@ public class HWatershed_Plugin extends AbstractOp  {
 		SegmentHierarchyToLabelMap<FloatType> segmentTreeLabeler = new SegmentHierarchyToLabelMap<FloatType>( hSegmentTree, hSegmentMap, imgIN );
 		
 		boolean makeNewLabels = true;
-		int nLabels = segmentTreeLabeler.updateTreeLabeling( hMin , makeNewLabels);
+		segmentTreeLabeler.updateTreeLabeling( hMin , makeNewLabels);
 		Img<IntType> imgOUT = segmentTreeLabeler.getLabelMap( thresh , peakFlooding);
 		
 		// format the output image
-		impOUT = ImageJFunctions.wrapFloat(imgOUT, impIN.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+nLabels+")" );
+		IntType minPixel = new IntType();
+		IntType maxPixel = new IntType();
+		ComputeMinMax<IntType> computeMinMax = new ComputeMinMax<>( imgOUT, minPixel, maxPixel);
+		computeMinMax.process();
+		
+		impOUT = ImageJFunctions.wrapFloat(imgOUT, impIN.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+ maxPixel.get() +")" );
 		int zMax=1;
 		if( nDims==3 )
 			zMax = (int)imgOUT.dimension(3); 
@@ -110,10 +118,29 @@ public class HWatershed_Plugin extends AbstractOp  {
 		if( segmentationLUT == null ){
 			IJ.run(impOUT, "3-3-2 RGB", "");
 		}
-		impOUT.setDisplayRange(0, nLabels, 0);
+		impOUT.setDisplayRange(0,  maxPixel.get() , 0);
 		
 		
 		
 	}
+	
+	
+	public static <T extends RealType<T>> void main(final String... args) throws Exception {
+		// Launch ImageJ as usual.
+		final ImageJ ij = new ImageJ();
+		ij.launch(args);
+		
+		// Launch the command .
+		IJ.openImage("F:\\projects\\2DEmbryoSection_Mette.tif").show();
+		//Dataset dataset = (Dataset) ij.io().open("F:\\projects\\2DEmbryoSection_Mette.tif");
+		//Dataset dataset2 = (Dataset) ij.io().open("F:\\projects\\2D_8peaks.tif");
+		//ij.ui().show(dataset);
+		
+		ij.command().run(HWatershed_Plugin.class, true);
+		
+		
+	}
+	
+	
 
 }
