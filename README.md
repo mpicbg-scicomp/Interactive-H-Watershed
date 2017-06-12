@@ -8,7 +8,7 @@ lazilly relabelling the part of the image visualized.
 Simply clone the repository and load it in your IDE as a maven project to compile it
 
 ## To try the plugin:
-In imageJ add the SCF-MPI-CBG update site. Open the image to segment and then click the menu entry SCF>Interactive H_Watershed
+In imageJ add the SCF-MPI-CBG update site. Open the image to segment and then click the menu entry SCF>Labeling>Interactive H_Watershed
 
 For more details information on the plugin usage and principlesgo to the [plugin wiki page](http://imagej.net/Interactive_Watershed) 
 
