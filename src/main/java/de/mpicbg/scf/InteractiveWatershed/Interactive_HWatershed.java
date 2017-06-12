@@ -164,6 +164,12 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	boolean initInterupted = false;
 	
 	double[] displaySpacing;
+
+	/**
+	 * This variable ensures that the user can enter parameters (hmin, threshold) smoothly, even though
+	 * the sliders only provide integer hanlding
+	 */
+	private double step_size = 0.05;
 	
 	// -- Command methods --
 
@@ -234,16 +240,16 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		// initialize seed threshold (jMin) slider attributes ////////////////////// 
 		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("hMin_log", Float.class);
 		thresholdItem.setMinimumValue( new Float(0) );
-		thresholdItem.setMaximumValue( new Float(Math.log(maxI-minI+1)) );
-		thresholdItem.setStepSize( 0.05);
+		thresholdItem.setMaximumValue( new Float(Math.log(maxI-minI+1) / step_size ));
+		//thresholdItem.setStepSize( 0.05);
 		hMin_log = 0f;
 		thresholdItem.setValue(this, hMin_log);
 		
 		// initialize intensity threshold slider attributes ////////////////////////////
 		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("thresh_log", Float.class);
 		thresholdItem2.setMinimumValue( new Float(0) );
-		thresholdItem2.setMaximumValue( new Float(Math.log(maxI-minI+1)) );
-		thresholdItem2.setStepSize( 0.05);
+		thresholdItem2.setMaximumValue( new Float(Math.log(maxI-minI+1) / step_size ));
+		//thresholdItem2.setStepSize( 0.05);
 		thresh_log = 0f;
 		thresholdItem2.setValue(this, thresh_log);
 		
@@ -314,13 +320,13 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	
 	private float getHMin(){
-		return (float)Math.exp(hMin_log)+minI-1;
+		return (float)Math.exp(hMin_log * step_size)+minI-1;
 	}
 	
 	
 	
 	private float getThresh(){
-		return (float)Math.exp(thresh_log)+minI-1;
+		return (float)Math.exp(thresh_log * step_size)+minI-1;
 	}
 	
 	
