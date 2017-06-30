@@ -449,6 +449,9 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
 			RandomAccessibleInterval<IntType> rai_currentSegmentation =  Views.dropSingletonDimensions(img_currentSegmentation);
 			
+			segDispRange[0] = 0;
+			segDispRange[1] = segmentTreeLabeler.getNumberOfLabels();
+			
 			
 			long[] dimTest = new long[img_currentSegmentation.numDimensions()];
 			img_currentSegmentation.dimensions(dimTest);
@@ -851,7 +854,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			return;
 		}
 			
-		boolean makeNewLabels = true ; 
+		//boolean makeNewLabels = true ; 
 		double hMin = previous.get("hMin");
 		double thresh = previous.get("thresh");
 		double peakFlooding = previous.get("peakFlooding");
