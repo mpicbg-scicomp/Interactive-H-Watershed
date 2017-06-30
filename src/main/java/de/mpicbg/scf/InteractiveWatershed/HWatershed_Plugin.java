@@ -128,7 +128,7 @@ public class HWatershed_Plugin extends AbstractOp  {
 	public static <T extends RealType<T>> void main(final String... args) throws Exception {
 		// Launch ImageJ as usual.
 		final ImageJ ij = new ImageJ();
-		ij.launch(args);
+		ij.ui().showUI();//launch(args);
 		
 		// Launch the command .
 		IJ.openImage("F:\\projects\\2DEmbryoSection_Mette.tif").show();
