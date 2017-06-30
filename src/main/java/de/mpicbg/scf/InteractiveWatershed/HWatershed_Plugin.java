@@ -92,8 +92,9 @@ public class HWatershed_Plugin extends AbstractOp  {
 		Img<IntType> hSegmentMap = segmentTreeConstructor.getLabelMapMaxTree();
 		SegmentHierarchyToLabelMap<FloatType> segmentTreeLabeler = new SegmentHierarchyToLabelMap<FloatType>( hSegmentTree, hSegmentMap, imgIN );
 		
-		boolean makeNewLabels = true;
-		segmentTreeLabeler.updateTreeLabeling( hMin , makeNewLabels);
+		//boolean makeNewLabels = true;
+		//segmentTreeLabeler.updateTreeLabeling( hMin , makeNewLabels);
+		segmentTreeLabeler.updateTreeLabeling( hMin );
 		Img<IntType> imgOUT = segmentTreeLabeler.getLabelMap( thresh , peakFlooding);
 		
 		// format the output image

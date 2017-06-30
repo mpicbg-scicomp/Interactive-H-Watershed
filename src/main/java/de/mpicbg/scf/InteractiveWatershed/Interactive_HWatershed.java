@@ -460,11 +460,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		}
 		else if( changed.get("hMin") )
 		{
-			boolean makeNewLabels = true ; 
-			int nLabels = segmentTreeLabeler.updateTreeLabeling( getHMin() , makeNewLabels );
-			segDispRange[0] = 0;
-			segDispRange[1] = nLabels;
+			//boolean makeNewLabels = true ; 
+			//int nLabels = segmentTreeLabeler.updateTreeLabeling( getHMin() , makeNewLabels );
+			segmentTreeLabeler.updateTreeLabeling( getHMin() );
+			
 			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
+			segDispRange[0] = 0;
+			segDispRange[1] = segmentTreeLabeler.getNumberOfLabels();
+			
 			RandomAccessibleInterval<IntType> rai_currentSegmentation =  Views.dropSingletonDimensions(img_currentSegmentation);
 			
 			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
@@ -853,15 +856,17 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		double thresh = previous.get("thresh");
 		double peakFlooding = previous.get("peakFlooding");
 		
-		segmentTreeLabeler.updateTreeLabeling( (float)hMin , makeNewLabels);
+		//segmentTreeLabeler.updateTreeLabeling( (float)hMin , makeNewLabels);
+		segmentTreeLabeler.updateTreeLabeling( (float)hMin );
 		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)thresh , (float)peakFlooding);
+		int nLabels = segmentTreeLabeler.getNumberOfLabels();
+		
+		//IntType minPixel = new IntType();
+		//IntType maxPixel = new IntType();
+		//ComputeMinMax<IntType> computeMinMax = new ComputeMinMax<>(export_img, minPixel, maxPixel);
+		//computeMinMax.process();
 
-		IntType minPixel = new IntType();
-		IntType maxPixel = new IntType();
-		ComputeMinMax<IntType> computeMinMax = new ComputeMinMax<>(export_img, minPixel, maxPixel);
-		computeMinMax.process();
-
-		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, imp0.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+ maxPixel.get() +")" );
+		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, imp0.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+ nLabels +")" );
 		
 		int zMax=1;
 		if( nDims==3 )
@@ -871,7 +876,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		exported_imp.setOpenAsHyperStack(true);
 		//LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
 		exported_imp.setLut(segLut);
-		exported_imp.setDisplayRange(0,  maxPixel.get(), 0);
+		exported_imp.setDisplayRange(0,  nLabels , 0);
 		exported_imp.show();
 		
 		Recorder recorder =  Recorder.getInstance();  
