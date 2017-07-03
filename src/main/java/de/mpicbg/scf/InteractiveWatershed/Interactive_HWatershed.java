@@ -60,7 +60,6 @@ import ij.plugin.frame.Recorder;
 import net.imagej.ImageJ;
 import net.imglib2.Cursor;
 import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.algorithm.stats.ComputeMinMax;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.img.display.imagej.ImageJFunctions;
@@ -101,10 +100,10 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(label = "Analyzed image" , visibility = ItemVisibility.MESSAGE, persist = false)
 	private String analyzedImageName = "test";
 	
-	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Seed dynamics", stepSize="0.05")
+	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Seed dynamics", stepSize="1.0")
 	private Float hMin_log;
 	
-	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Intensity threshold", stepSize="0.05")
+	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Intensity threshold", stepSize="1.0")
 	private Float thresh_log;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="peak flooding (in %)", min="0", max="100")
@@ -141,8 +140,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	Map<String, Boolean> changed;	//
 	Map<String, Double> previous;	//
 	
-	float minI, maxI; 				// min and max intensity of the input image
-	int nDims; 						// dimensionnality of the input image
+	float minI, minDyn; 				// min and max intensity of the input image
+	int nDims; 						// dimensionality of the input image
 	SegmentHierarchyToLabelMap<FloatType> segmentTreeLabeler;
 
 	ImagePlus impSegmentationDisplay; // the result window interactively updated
@@ -166,11 +165,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	double[] displaySpacing;
 
+	
+	int sliderNStep = 1000;
+	
 	/**
 	 * This variable ensures that the user can enter parameters (hmin, threshold) smoothly, even though
-	 * the sliders only provide integer hanlding
+	 * the sliders only provide integer handling
 	 */
-	private double step_size = 0.05;
+	private double stepSize;
 	
 	// -- Command methods --
 
@@ -230,9 +232,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		// Initialize the UI //////////////////////////////////////////////////////
 
 		double[] dynamics = hSegmentTree.getFeature("dynamics");
-		maxI = (float) Arrays.stream(dynamics).max().getAsDouble();
-		minI = (float) Arrays.stream(dynamics).min().getAsDouble(); ;
+		double[] maxima = hSegmentTree.getFeature("Imax");
 		
+		float maxI = (float) Arrays.stream(maxima).max().getAsDouble();
+		float maxDyn = (float) Arrays.stream(dynamics).max().getAsDouble();
+		minDyn = 0f;
+		minI = maxI-maxDyn;
+		
+		stepSize = Math.log(maxDyn+1)/sliderNStep ;
 		
 		// initialize analyzed image name  ////////////////////// 
 		final MutableModuleItem<String> AnalyzedImageItem = getInfo().getMutableInput("analyzedImageName", String.class);
@@ -241,7 +248,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		// initialize seed threshold (jMin) slider attributes ////////////////////// 
 		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("hMin_log", Float.class);
 		thresholdItem.setMinimumValue( new Float(0) );
-		thresholdItem.setMaximumValue( new Float(Math.log(maxI-minI+1) / step_size ));
+		thresholdItem.setMaximumValue( new Float( sliderNStep ));
 		//thresholdItem.setStepSize( 0.05);
 		hMin_log = 0f;
 		thresholdItem.setValue(this, hMin_log);
@@ -249,7 +256,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		// initialize intensity threshold slider attributes ////////////////////////////
 		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("thresh_log", Float.class);
 		thresholdItem2.setMinimumValue( new Float(0) );
-		thresholdItem2.setMaximumValue( new Float(Math.log(maxI-minI+1) / step_size ));
+		thresholdItem2.setMaximumValue( new Float( sliderNStep ));
 		//thresholdItem2.setStepSize( 0.05);
 		thresh_log = 0f;
 		thresholdItem2.setValue(this, thresh_log);
@@ -321,13 +328,18 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	
 	private float getHMin(){
-		return (float)Math.exp(hMin_log * step_size)+minI-1;
+		float val = (float)Math.exp(hMin_log * stepSize )+minDyn-1;
+		System.out.println("hmin="+val);
+		return val;
 	}
 	
 	
 	
 	private float getThresh(){
-		return (float)Math.exp(thresh_log * step_size)+minI-1;
+		float val = (float)Math.exp(thresh_log * stepSize )+minI-1;
+		System.out.println("thresh="+val);
+
+		return val;
 	}
 	
 	

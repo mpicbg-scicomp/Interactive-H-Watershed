@@ -517,7 +517,7 @@ public class HWatershedLabeling<T extends RealType<T>> {
 			children[i] = new int[] {-1,-1};
 			parent[i]=i;
 			hCriteria[i]=0;
-			Imax[i]=0;
+			Imax[i]=min;
 		}
 		
 		// fill the queue

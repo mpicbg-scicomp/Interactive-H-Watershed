@@ -26,6 +26,8 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 */
 
 
+import java.util.Arrays;
+
 import net.imglib2.Cursor;
 import net.imglib2.IterableInterval;
 import net.imglib2.type.numeric.RealType;
@@ -191,7 +193,7 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 		
 		
 		double[] Imax = segmentTree0.getFeature("Imax");
-		
+		double minI = Imax[0]; // Imax is set to min of the image for the node 0  (it represents the background)
 		// create a new (continuous) labeling where only the region visible in the current labeling (and threshold) are numbered
 		int nNodes = segmentTree0.getNumNodes();
 		int[] nodeIdToLabel2 = new int[nNodes];
@@ -200,7 +202,8 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 		for(int i=0; i<nNodes ; i++)
 		{
 			int parent = nodeIdToLabel[i];
-			if( Imax[parent] >= threshold )
+			double ImaxParent = Imax[parent]; 
+			if( ImaxParent >= threshold && ImaxParent>minI )
 			{
 				int parentLabel = labelled[parent];
 				if( parentLabel > 0 ) // parent is already labelled, label the node according to its parent
@@ -224,6 +227,15 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 		for(int i=0;i<nNode; i++)
 			peakThresholds[i] =  threshold + ((float)Imax[i]-threshold)*(1f-percentFlooding/100f);
 		
+		//System.out.println("lookup node to label: " + Arrays.toString(nodeIdToLabel) );
+		//System.out.println("lookup node to label2: " + Arrays.toString(nodeIdToLabel2) );
+		//System.out.println("lookup node to Imax: " + Arrays.toString(Imax) );
+		//double[] dynamics = segmentTree0.getFeature("dynamics");
+		//System.out.println("lookup node to dyn: " + Arrays.toString(dynamics) );
+		//System.out.println("lookup node to thresh: " + Arrays.toString(peakThresholds) );
+		
+		
+		
 		Cursor<IntType> cursor = segmentMap.cursor();
 		Cursor<T> cursorImg = intensity.cursor();
 		while( cursor.hasNext() )
@@ -232,13 +244,13 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 			float val =imgPixel.getRealFloat();
 			
 			IntType pixel = cursor.next();
-			int node = (int)pixel.getRealFloat();
-			int label = nodeIdToLabel2[node];
-			int labelRoot = segmentTree0.nodes.get(node).labelRoot;
 			if(  val >= threshold )
 			{
+				int node = (int)pixel.getRealFloat();
+				int labelRoot = segmentTree0.nodes.get(node).labelRoot;
 				if(  val >= peakThresholds[labelRoot]  )
 				{	
+					int label = nodeIdToLabel2[node];
 					float finalVal = (float)label;
 					pixel.setReal( finalVal );
 				}
