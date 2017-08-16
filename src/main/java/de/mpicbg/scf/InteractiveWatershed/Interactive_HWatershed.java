@@ -881,8 +881,10 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		//ComputeMinMax<IntType> computeMinMax = new ComputeMinMax<>(export_img, minPixel, maxPixel);
 		//computeMinMax.process();
 
-		ImagePlus exported_imp = ImageJFunctions.wrapFloat(export_img, imp0.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+ nLabels +")" );
-		
+		ImagePlus exported_imp_virtual = ImageJFunctions.wrap(export_img, imp0.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+ nLabels +")" );
+		ImagePlus exported_imp = exported_imp_virtual.duplicate(); 
+		exported_imp.setCalibration( imp0.getCalibration() );
+
 		int zMax=1;
 		if( nDims==3 )
 			zMax = (int)export_img.dimension(3); 
@@ -903,7 +905,6 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				Recorder.recordCall("# @ImagePlus impIN");
 				Recorder.recordCall("# @OpService ops");
 				Recorder.recordCall("# @OUTPUT ImagePlus impOUT");
-				
 				Recorder.recordCall("impOUT = ops.run(\"H_Watershed\", impIN, "+hMin+", "+thresh+", "+peakFlooding+")");
 			}
 		}
