@@ -26,6 +26,15 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 */
 
 
+
+
+/*
+ * TODO:
+ * 	- Set smarter value for seed dynamics and intensity threshold
+ * 	  maybe it could be done with a Dynamic plugin
+ *  - remove the limitation to 3D image
+ */
+
 import java.io.File;
 
 import ij.IJ;
@@ -49,7 +58,7 @@ import org.scijava.plugin.Plugin;
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
 
-@Plugin(type = Op.class, name="H_Watershed", menuPath = "SCF>Labeling>H_Watershed", headless = true, label="H_Watershed", visible=true)
+@Plugin(type = Op.class, name="H_Watershed", headless = true, label="H_Watershed", visible=true) // menu is not set, meaning the plugin won't appear in imagej's menu
 public class HWatershed_Plugin extends AbstractOp  {
 
 	
@@ -60,15 +69,22 @@ public class HWatershed_Plugin extends AbstractOp  {
 	@Parameter (type = ItemIO.OUTPUT)
 	private	ImagePlus impOUT;
 	
-	@Parameter( label="Seed dynamics", stepSize="0.05")
+	@Parameter( label="Seed dynamics", persist=false, required=false ) // with persist and required set to false the parameter become optional
 	private Float hMin;
 	
-	@Parameter( label="Intensity threshold")
+	@Parameter( label="Intensity threshold", persist=false, required=false ) // with persist and required set to false the parameter become optional
 	private Float thresh;
 	
-	@Parameter( label="peak flooding (in %)")
-	private Float peakFlooding;
+	@Parameter( label="peak flooding (in %)", persist=false, required=false ) // with persist and required set to false the parameter become optional
+	private Float peakFlooding = 100f;
 	
+	FloatType min = new FloatType(Float.MAX_VALUE), max = new FloatType(Float.MIN_VALUE);
+	Img<FloatType> imgIN;
+	
+	private void computeMinMax(){
+		if( min.getRealFloat() > max.getRealFloat() )
+			ComputeMinMax.computeMinMax(imgIN, min, max);
+	}
 	
 	@Override
 	public void run() {
@@ -77,11 +93,28 @@ public class HWatershed_Plugin extends AbstractOp  {
 			return;
 		}
 		
-		Img<FloatType> imgIN = ImageJFunctions.convertFloat(impIN); 
+		imgIN = ImageJFunctions.convertFloat(impIN); 
 		int nDims = imgIN.numDimensions();
 		if( nDims>3){
 			IJ.error("The Interactive Watershed plugin handles only graylevel 2D/3D images \n Current image has more dimensions." );
 		}
+		
+		
+		// Check parameters
+		
+		if ( hMin == null ){
+			// if hMin is not provided set it to 5% of the image range
+			computeMinMax();
+			hMin =  0.05f * ( max.getRealFloat() - min.getRealFloat() ) ;
+		}
+		
+		if ( thresh == null ){
+			// if thresh is not provided, set it to the minimum of the image
+			computeMinMax();
+			thresh = min.getRealFloat();
+		}
+		
+		
 		
 		// build the segment tree
 		float threshold0 = Float.NEGATIVE_INFINITY; // we will flood the whole image in the first place

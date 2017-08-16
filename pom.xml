@@ -8,13 +8,13 @@
     <parent>
         <groupId>org.scijava</groupId>
         <artifactId>pom-scijava</artifactId>
-        <version>16.1.0</version>
+        <version>16.2.0</version>
         <relativePath/>
     </parent>
 
     <groupId>de.mpicbg.scf</groupId>
     <artifactId>InteractiveWatershed</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
 
     <name>InteractiveWatershed</name>
     <description>
@@ -40,7 +40,7 @@
             <organization>Scientific Computing Facility, MPI CBG Dresden</organization>
             <url>http://imagej.net/User:Benoit</url>
             <roles>
-				<role>lead</role>
+				<role>founder</role>
 				<role>developer</role>
                 <role>maintainer</role>
             </roles>
