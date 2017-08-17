@@ -58,7 +58,7 @@ import org.scijava.plugin.Plugin;
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
 
-@Plugin(type = Op.class, name="H_Watershed", headless = true, label="H_Watershed", visible=true) // menu is not set, meaning the plugin won't appear in imagej's menu
+@Plugin(type = Op.class, name="H_Watershed", headless = true, label="H_Watershed", visible=true, menuPath = "SCF>Labeling>H_Watershed") // menu is not set, meaning the plugin won't appear in imagej's menu
 public class HWatershed_Plugin extends AbstractOp  {
 
 	

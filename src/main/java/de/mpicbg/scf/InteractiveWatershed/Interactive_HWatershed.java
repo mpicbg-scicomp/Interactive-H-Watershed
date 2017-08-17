@@ -894,7 +894,6 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		//LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
 		exported_imp.setLut(segLut);
 		exported_imp.setDisplayRange(0,  nLabels , 0);
-		exported_imp.show();
 		
 		Recorder recorder =  Recorder.getInstance();  
 		if( recorder != null ){
@@ -908,6 +907,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				Recorder.recordCall("impOUT = ops.run(\"H_Watershed\", impIN, "+hMin+", "+thresh+", "+peakFlooding+")");
 			}
 		}
+		
+		exported_imp.show();
 		
 	}
 	
