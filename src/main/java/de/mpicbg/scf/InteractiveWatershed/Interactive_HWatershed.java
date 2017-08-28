@@ -858,14 +858,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	}
 	
 	
-	
-	
-	protected void exportButton_callback(){
-		
-		if( initInterupted ){
-			return;
-		}
-			
+	public ImagePlus getCurrentLabelMap()
+	{
 		//boolean makeNewLabels = true ; 
 		double hMin = previous.get("hMin");
 		double thresh = previous.get("thresh");
@@ -894,6 +888,21 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		//LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
 		exported_imp.setLut(segLut);
 		exported_imp.setDisplayRange(0,  nLabels , 0);
+		
+		return exported_imp;
+	}
+	
+	protected void exportButton_callback(){
+		
+		if( initInterupted ){
+			return;
+		}
+			
+		double hMin = previous.get("hMin");
+		double thresh = previous.get("thresh");
+		double peakFlooding = previous.get("peakFlooding");
+		
+		ImagePlus exported_imp = getCurrentLabelMap();
 		
 		Recorder recorder =  Recorder.getInstance();  
 		if( recorder != null ){
