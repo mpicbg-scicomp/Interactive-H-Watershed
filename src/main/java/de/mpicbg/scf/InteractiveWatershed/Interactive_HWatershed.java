@@ -100,13 +100,13 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(label = "Analyzed image" , visibility = ItemVisibility.MESSAGE, persist = false)
 	private String analyzedImageName = "test";
 	
-	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = true, label="Seed dynamics", stepSize="1.0")
+	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Seed dynamics", stepSize="1.0")
 	private Float hMin_log;
 	
-	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = true, label="Intensity threshold", stepSize="1.0")
+	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Intensity threshold", stepSize="1.0")
 	private Float thresh_log;
 	
-	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = true, label="peak flooding (in %)", min="0", max="100")
+	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="peak flooding (in %)", min="0", max="100")
 	private Float peakFlooding;
 	
 	@Parameter(style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "Image", "Contour overlay", "Solid overlay" } )
@@ -115,11 +115,11 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(label = "Slicing axis", style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "X", "Y", "Z" }, persist = false)
 	private String slicingDirection = "Z";
 	
-	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE, persist = true) // persist is important otherwise it keep the value used previously independant what is set manually
+	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE, persist = false) // persist is important otherwise it keep the value used previously independant what is set manually
 	private String imageToDisplayName;
 	
-	//@Parameter(label = "export", callback="exportButton_callback" )
-	//private Button exportButton;
+	@Parameter(label = "export", callback="exportButton_callback" )
+	private Button exportButton;
 	
 	
 	//@Parameter
@@ -858,8 +858,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	}
 	
 	
-	public ImagePlus getCurrentLabelMap()
-	{
+	
+	
+	protected void exportButton_callback(){
+		
+		if( initInterupted ){
+			return;
+		}
+			
 		//boolean makeNewLabels = true ; 
 		double hMin = previous.get("hMin");
 		double thresh = previous.get("thresh");
@@ -888,21 +894,6 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		//LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
 		exported_imp.setLut(segLut);
 		exported_imp.setDisplayRange(0,  nLabels , 0);
-		
-		return exported_imp;
-	}
-	
-	protected void exportButton_callback(){
-		
-		if( initInterupted ){
-			return;
-		}
-			
-		double hMin = previous.get("hMin");
-		double thresh = previous.get("thresh");
-		double peakFlooding = previous.get("peakFlooding");
-		
-		ImagePlus exported_imp = getCurrentLabelMap();
 		
 		Recorder recorder =  Recorder.getInstance();  
 		if( recorder != null ){
