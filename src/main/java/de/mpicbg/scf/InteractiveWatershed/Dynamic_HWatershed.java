@@ -36,7 +36,9 @@ import java.awt.event.MouseMotionListener;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import ij.IJ;
@@ -72,23 +74,39 @@ import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 import org.scijava.widget.ChoiceWidget;
 import org.scijava.widget.NumberWidget;
+import org.scijava.module.Module;
 import org.scijava.module.MutableModuleItem;
 import org.scijava.ItemIO;
 
-//import net.imagej.ops.AbstractOp;
-//import net.imagej.ops.Op;
+// for static function (to run the command without preprocessor)
+import org.scijava.command.CommandInfo;
+import org.scijava.command.CommandService;
+import org.scijava.module.process.PostprocessorPlugin;
+import org.scijava.module.process.PreprocessorPlugin;
 
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
+/*
+ * TODO:
+ *  [-] Clean unneeded infrastructure as this is a simplified version of 
+ *  	[-] remove the slicing direction infrastructure
+ *  	[-] clean the image to Display infrastructure
+ *  	[-] clean the image to Display infrastructure
+ *  	[-] clean he lut handling infrastructure (in the long term will only need the sef_Lut)
+ *  [x] add utils to run command from script
+ *  [-] visualize directly the current segmentation on the show image
+ *  	[-] set up a drop down to change labelMap lut
+ *  	[-] remove the "image" display mode 
+ *  [-] handle any image (possibly with a roi rectangle Roi as input by duplicating the current timestep
+ *  
+ */
 
 /**
  * An plugin allowing to explore the watershed from hMaxima 
  * Can be called from a script to allow semi manual segmentation on the fly 
  */
-@Plugin(type = Command.class, menuPath = "SCF>Labeling>Dynamic H_Watershed", initializer="initialize_HWatershed", headless = false, label="Dynamic H_Watershed")
+@Plugin(type = Command.class, initializer="initialize_HWatershed", headless = false, label="Dynamic H_Watershed")
 public class Dynamic_HWatershed extends DynamicCommand implements Previewable, MouseMotionListener {
-//@Plugin(type = Op.class, menuPath = "SCF>Labeling>Dynamic H_Watershed", initializer="initialize_HWatershed", headless = false, label="Dynamic_H_Watershed", name="Dynamic_H_Watershed")
-//public class Dynamic_HWatershed extends AbstractOp implements Previewable, MouseMotionListener {
 
 	// -- Parameters --
 	@Parameter (type = ItemIO.INPUT)
@@ -971,5 +989,32 @@ public class Dynamic_HWatershed extends DynamicCommand implements Previewable, M
 		return canvas == null ? -1 : canvas.offScreenX(e.getY());
 	}
 
+	
+	////////////////////////////////////////////////////////////////////////
+	// convenience function to run the command from an ImageJ2 script 
+	////////////////////////////////////////////////////////////////////////
+	
+	private static CommandInfo getOrCreate( String commandClassName, CommandService commandService )
+	{
+		CommandInfo command = commandService.getCommand(commandClassName);
+		if ( command != null ) {
+			return command;
+		}
+		return new CommandInfo(commandClassName);
+	}
+	
+	public static Future<Module> runCommandWithPreprocessor( CommandService commandService , Object... inputs)
+	{																						// from a jython script one can pass a
+																							// jython list of alternating string object
+																							// if Object... does not work
+																							// one can try Map<String,Object>
+		
+		CommandInfo commandInfo = getOrCreate( Dynamic_HWatershed.class.getName(), commandService );
+		List<PreprocessorPlugin> preProcessor = commandService.pluginService().createInstancesOfType( PreprocessorPlugin.class );
+		List<PostprocessorPlugin> postProcessor = null;
+		Future<Module> future = commandService.moduleService().run( commandInfo, preProcessor, postProcessor,  inputs);
+		
+		return future;
+	}
 
 }
