@@ -79,7 +79,7 @@ public class HWatershed_Plugin extends AbstractOp  {
 	@Parameter( label="peak flooding (in %)", persist=false, required=false ) // with persist and required set to false the parameter become optional
 	private Float peakFlooding = 100f;
 	
-	@Parameter(label = "export regions mask", style = ChoiceWidget.LIST_BOX_STYLE, persist = false, required=false , description="if checked the output will be compatible with the particle analyzer") // persist is important otherwise it keep the value used previously independant what is set manually
+	@Parameter(label = "export regions mask", persist = false, required=false , description="if checked the output will be compatible with the particle analyzer") // persist is important otherwise it keep the value used previously independant what is set manually
 	private Boolean outputMask = false;
 	
 	FloatType min = new FloatType(Float.MAX_VALUE), max = new FloatType(Float.MIN_VALUE);
@@ -164,7 +164,9 @@ public class HWatershed_Plugin extends AbstractOp  {
 		}
 		impOUT.setDisplayRange(0,  maxPixel.get() , 0);
 		
-		
+		if(outputMask) {
+			IJ.run( impOUT , "8-bit", "");
+		}
 		
 	}
 	

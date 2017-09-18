@@ -118,7 +118,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE, persist = false) // persist is important otherwise it keep the value used previously independant what is set manually
 	private String imageToDisplayName;
 	
-	@Parameter(label = "export regions mask", style = ChoiceWidget.LIST_BOX_STYLE, persist = false, description="if checked the output will be compatible with the particle analyzer") // persist is important otherwise it keep the value used previously independant what is set manually
+	@Parameter(label = "export regions mask", persist = false, description="if checked the output will be compatible with the particle analyzer") // persist is important otherwise it keep the value used previously independant what is set manually
 	private Boolean outputMask = false;
 	
 	@Parameter(label = "export", callback="exportButton_callback" )
@@ -901,6 +901,10 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		//LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
 		exported_imp.setLut(segLut);
 		exported_imp.setDisplayRange(0,  nLabels , 0);
+		
+		if(outputMask) {
+				IJ.run( exported_imp , "8-bit", "");
+		}
 		
 		Recorder recorder =  Recorder.getInstance();  
 		if( recorder != null ){
