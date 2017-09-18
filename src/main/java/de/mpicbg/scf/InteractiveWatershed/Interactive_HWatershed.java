@@ -118,6 +118,9 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(label = "View image", style = ChoiceWidget.LIST_BOX_STYLE, persist = false) // persist is important otherwise it keep the value used previously independant what is set manually
 	private String imageToDisplayName;
 	
+	@Parameter(label = "export regions mask", style = ChoiceWidget.LIST_BOX_STYLE, persist = false, description="if checked the output will be compatible with the particle analyzer") // persist is important otherwise it keep the value used previously independant what is set manually
+	private Boolean outputMask = false;
+	
 	@Parameter(label = "export", callback="exportButton_callback" )
 	private Button exportButton;
 	
@@ -876,6 +879,10 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)thresh , (float)peakFlooding);
 		int nLabels = segmentTreeLabeler.getNumberOfLabels();
 		
+		if(  outputMask ) {
+			export_img = Utils.getPARegions( export_img );
+		}
+		
 		//IntType minPixel = new IntType();
 		//IntType maxPixel = new IntType();
 		//ComputeMinMax<IntType> computeMinMax = new ComputeMinMax<>(export_img, minPixel, maxPixel);
@@ -898,13 +905,13 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		Recorder recorder =  Recorder.getInstance();  
 		if( recorder != null ){
 			if( !Recorder.scriptMode() ){
-				Recorder.record("run","H_Watershed", "impin=[" + imp0.getTitle() + "] hmin=" + hMin + " thresh=" + thresh + " peakflooding=" + peakFlooding);
+				Recorder.record("run","H_Watershed", "impin=[" + imp0.getTitle() + "] hmin=" + hMin + " thresh=" + thresh + " peakflooding=" + peakFlooding+" outputmask="+outputMask);
 			}
 			else{
 				Recorder.recordCall("# @ImagePlus impIN");
 				Recorder.recordCall("# @OpService ops");
 				Recorder.recordCall("# @OUTPUT ImagePlus impOUT");
-				Recorder.recordCall("impOUT = ops.run(\"H_Watershed\", impIN, "+hMin+", "+thresh+", "+peakFlooding+")");
+				Recorder.recordCall("impOUT = ops.run(\"H_Watershed\", impIN, "+hMin+", "+thresh+", "+peakFlooding + ", " + outputMask + ")" );
 			}
 		}
 		

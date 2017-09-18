@@ -30,6 +30,7 @@ import ij.ImagePlus;
 
 import net.imglib2.Cursor;
 import net.imglib2.RandomAccess;
+import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.RealRandomAccess;
 import net.imglib2.img.Img;
 import net.imglib2.img.ImgFactory;
@@ -39,7 +40,11 @@ import net.imglib2.interpolation.randomaccess.LanczosInterpolatorFactory;
 import net.imglib2.interpolation.randomaccess.NLinearInterpolatorFactory;
 import net.imglib2.interpolation.randomaccess.NearestNeighborInterpolatorFactory;
 import net.imglib2.type.NativeType;
+import net.imglib2.type.logic.BoolType;
 import net.imglib2.type.numeric.RealType;
+import net.imglib2.type.numeric.integer.IntType;
+import net.imglib2.util.Intervals;
+import net.imglib2.util.Util;
 import net.imglib2.view.Views;
 
 import de.mpicbg.scf.InteractiveWatershed.imgTools.ImageConnectivity;
@@ -209,6 +214,67 @@ public class Utils {
 					if ( nVal != pVal ) {
 						raOut.setPosition(pos);
 						raOut.get().setReal(pVal);
+						break;
+					}
+				}
+				
+			}
+		}
+		return output;
+	}
+	
+	
+	
+	/**
+	 *  Build an image compatible with particle analyzer (8-connected binary region )
+	 * @param input is a label image
+	 * @return is a binary image
+	 */
+	public static <T extends RealType<T> & NativeType<T>> Img<IntType> getPARegions(RandomAccessibleInterval<T> input)
+	{
+		int nDim = input.numDimensions();
+		long[] dims = new long[nDim];
+		input.dimensions(dims);
+		ImgFactory<IntType> imgFactory = Util.getArrayOrCellImgFactory( input ,  new IntType(0) );
+		Img<IntType> output = imgFactory.create(  input, new IntType()  );
+				
+		
+		Connectivity connectivity = Connectivity.FULL; 
+		RandomAccess<T> raIn = Views.extendMirrorSingle(input).randomAccess();
+		
+		// random accessible on the ouput
+		RandomAccess<IntType> raOut = output.randomAccess();
+		
+		// define the connectivity
+		long[][] neigh = ImageConnectivity.getConnectivityPos(nDim, connectivity.getConn() );
+		int[] n_offset = ImageConnectivity.getIdxOffsetToCenterPix(neigh, dims);
+		long[][] dPosList = ImageConnectivity.getSuccessiveMove(neigh);
+		int nNeigh = n_offset.length;
+		
+		long nElements = Intervals.numElements( input );
+		
+		// browse through the image
+		for(long idx=0; idx<nElements; idx++){
+			
+			final long[] pos = new long[nDim];
+			getPosFromIdx( idx, pos, dims);
+			raIn.setPosition(pos);
+			float pVal = raIn.get().getRealFloat();
+			
+			if( pVal > 0 ){
+				
+				// loop on neighbors
+				raOut.setPosition(pos);
+				raOut.get().setReal( 255 );
+			
+				for( int i =0; i<nNeigh; i++){
+					
+					raIn.move(dPosList[i]);
+					float nVal = raIn.get().getRealFloat();
+					
+					// if p is strictly inferior to n then p is is a border between two label, its value is set to 0
+					if ( pVal < nVal ) {
+						raOut.get().setReal( 0 );
 						break;
 					}
 				}

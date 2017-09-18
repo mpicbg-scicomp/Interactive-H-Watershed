@@ -54,6 +54,7 @@ import net.imglib2.type.numeric.real.FloatType;
 import org.scijava.ItemIO;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
+import org.scijava.widget.ChoiceWidget;
 
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
@@ -77,6 +78,9 @@ public class HWatershed_Plugin extends AbstractOp  {
 	
 	@Parameter( label="peak flooding (in %)", persist=false, required=false ) // with persist and required set to false the parameter become optional
 	private Float peakFlooding = 100f;
+	
+	@Parameter(label = "export regions mask", style = ChoiceWidget.LIST_BOX_STYLE, persist = false, required=false , description="if checked the output will be compatible with the particle analyzer") // persist is important otherwise it keep the value used previously independant what is set manually
+	private Boolean outputMask = false;
 	
 	FloatType min = new FloatType(Float.MAX_VALUE), max = new FloatType(Float.MIN_VALUE);
 	Img<FloatType> imgIN;
@@ -130,11 +134,17 @@ public class HWatershed_Plugin extends AbstractOp  {
 		segmentTreeLabeler.updateTreeLabeling( hMin );
 		Img<IntType> imgOUT = segmentTreeLabeler.getLabelMap( thresh , peakFlooding);
 		
+
+		
 		// format the output image
 		IntType minPixel = new IntType();
 		IntType maxPixel = new IntType();
 		ComputeMinMax<IntType> computeMinMax = new ComputeMinMax<>( imgOUT, minPixel, maxPixel);
 		computeMinMax.process();
+		
+		if(  outputMask ) {
+			imgOUT = Utils.getPARegions( imgOUT );
+		}
 		
 		impOUT = ImageJFunctions.wrapFloat(imgOUT, impIN.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+ maxPixel.get() +")" );
 		int zMax=1;
