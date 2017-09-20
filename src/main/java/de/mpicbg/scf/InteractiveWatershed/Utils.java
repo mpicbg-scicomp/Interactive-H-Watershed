@@ -40,7 +40,6 @@ import net.imglib2.interpolation.randomaccess.LanczosInterpolatorFactory;
 import net.imglib2.interpolation.randomaccess.NLinearInterpolatorFactory;
 import net.imglib2.interpolation.randomaccess.NearestNeighborInterpolatorFactory;
 import net.imglib2.type.NativeType;
-import net.imglib2.type.logic.BoolType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.util.Intervals;
@@ -265,16 +264,16 @@ public class Utils {
 				
 				// loop on neighbors
 				raOut.setPosition(pos);
-				raOut.get().setReal( 255 );
+				raOut.get().setInteger(255);
 			
 				for( int i =0; i<nNeigh; i++){
 					
 					raIn.move(dPosList[i]);
 					float nVal = raIn.get().getRealFloat();
 					
-					// if p is strictly inferior to n then p is is a border between two label, its value is set to 0
+					// if p is strictly inferior to n then p it is a border between two label, its value is set to 0
 					if ( pVal < nVal ) {
-						raOut.get().setReal( 0 );
+						raOut.get().setInteger( 0 );
 						break;
 					}
 				}

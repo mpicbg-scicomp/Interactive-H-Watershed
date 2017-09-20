@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import ij.IJ;
+import ij.process.ImageConverter;
 import ij.ImageListener;
 import ij.ImagePlus;
 import ij.WindowManager;
@@ -883,6 +884,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			export_img = Utils.getPARegions( export_img );
 		}
 		
+		
 		//IntType minPixel = new IntType();
 		//IntType maxPixel = new IntType();
 		//ComputeMinMax<IntType> computeMinMax = new ComputeMinMax<>(export_img, minPixel, maxPixel);
@@ -893,17 +895,23 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		exported_imp.setCalibration( imp0.getCalibration() );
 
 		int zMax=1;
-		if( nDims==3 )
+		if( nDims==3 ) {
 			zMax = (int)export_img.dimension(3); 
-		
-		exported_imp.setDimensions(1, zMax, 1);
-		exported_imp.setOpenAsHyperStack(true);
+			exported_imp.setDimensions(1, zMax, 1);
+			exported_imp.setOpenAsHyperStack(true);
+		}
 		//LUT segmentationLUT = (LUT) imp_curSeg.getProcessor().getLut().clone();
-		exported_imp.setLut(segLut);
-		exported_imp.setDisplayRange(0,  nLabels , 0);
 		
 		if(outputMask) {
-				IJ.run( exported_imp , "8-bit", "");
+			boolean doScaling = ImageConverter.getDoScaling();
+			ImageConverter.setDoScaling(false);
+			IJ.run( exported_imp , "8-bit", "");
+			ImageConverter.setDoScaling( doScaling );
+			exported_imp.changes = false;
+		}
+		else {
+			exported_imp.setLut(segLut);
+			exported_imp.setDisplayRange(0,  nLabels , 0);
 		}
 		
 		Recorder recorder =  Recorder.getInstance();  
@@ -942,12 +950,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	public static <T extends RealType<T>> void main(final String... args) throws Exception {
 		// Launch ImageJ as usual.
-		final ImageJ ij = net.imagej.Main.launch(args);
+		//final ImageJ ij = net.imagej.Main.launch(args);
 		
+		ImageJ ij = new ImageJ();
+		ij.ui().showUI();
 		
 		
 		// Launch the command .
-		IJ.openImage("F:\\projects\\2DPlatynereis.tif").show();
+		//IJ.openImage("F:\\projects\\2DPlatynereis.tif").show();
 		//Dataset dataset = (Dataset) ij.io().open("F:\\projects\\2DEmbryoSection_Mette.tif");
 		//Dataset dataset2 = (Dataset) ij.io().open("F:\\projects\\2D_8peaks.tif");
 		//ij.ui().show(dataset);
