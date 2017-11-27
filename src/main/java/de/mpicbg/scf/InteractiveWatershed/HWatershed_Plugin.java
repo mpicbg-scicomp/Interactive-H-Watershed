@@ -147,7 +147,10 @@ public class HWatershed_Plugin extends AbstractOp  {
 			imgOUT = Utils.getPARegions( imgOUT );
 		}
 		
-		impOUT = ImageJFunctions.wrapFloat(imgOUT, impIN.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+ maxPixel.get() +")" );
+		String title = impIN.getTitle() + " - watershed (h="+String.format("%5.2f", hMin)+", T="+String.format("%5.2f", thresh)+", %="+String.format("%2.0f", peakFlooding)+", n="+ maxPixel.get() +")";
+		ImagePlus impOUT0 = ImageJFunctions.wrapFloat(imgOUT, title );
+		impOUT = impOUT0.duplicate();
+		impOUT.setTitle( title );
 		int zMax=1;
 		if( nDims==3 ) {
 			zMax = (int)imgOUT.dimension(3); 
