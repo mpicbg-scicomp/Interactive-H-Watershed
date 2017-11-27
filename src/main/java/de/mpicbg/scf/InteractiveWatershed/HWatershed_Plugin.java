@@ -55,12 +55,13 @@ import net.imglib2.type.numeric.real.FloatType;
 import org.scijava.ItemIO;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
-import org.scijava.widget.ChoiceWidget;
 
 import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
 
-@Plugin(type = Op.class, name="H_Watershed", headless = true, label="H_Watershed", visible=true, menuPath = "SCF>Labeling>H_Watershed") // menu is not set, meaning the plugin won't appear in imagej's menu
+
+
+@Plugin(type = Op.class, name="H_Watershed", headless = true, label="H_Watershed", visible=true, menuPath = "SCF>Labeling>H_Watershed") // if menu is not set, the plugin won't appear in imagej's menu and won't be callable in macro
 public class HWatershed_Plugin extends AbstractOp  {
 
 	
@@ -80,8 +81,14 @@ public class HWatershed_Plugin extends AbstractOp  {
 	@Parameter( label="peak flooding (in %)", persist=false, required=false ) // with persist and required set to false the parameter become optional
 	private Float peakFlooding = 100f;
 	
+	@Parameter( label="keepOrphanPeaks", persist=false, required=false ) // with persist and required set to false the parameter become optional
+	private Boolean keepOrphanPeaks = true;
+	
 	@Parameter(label = "export regions mask", persist = false, required=false , description="if checked the output will be compatible with the particle analyzer") // persist is important otherwise it keep the value used previously independant what is set manually
 	private Boolean outputMask = false;
+	
+	
+	
 	
 	FloatType min = new FloatType(Float.MAX_VALUE), max = new FloatType(Float.MIN_VALUE);
 	Img<FloatType> imgIN;
@@ -129,14 +136,9 @@ public class HWatershed_Plugin extends AbstractOp  {
 		// segment tree to label map  
 		Img<IntType> hSegmentMap = segmentTreeConstructor.getLabelMapMaxTree();
 		SegmentHierarchyToLabelMap<FloatType> segmentTreeLabeler = new SegmentHierarchyToLabelMap<FloatType>( hSegmentTree, hSegmentMap, imgIN );
-		
-		//boolean makeNewLabels = true;
-		//segmentTreeLabeler.updateTreeLabeling( hMin , makeNewLabels);
-		segmentTreeLabeler.updateTreeLabeling( hMin );
-		Img<IntType> imgOUT = segmentTreeLabeler.getLabelMap( thresh , peakFlooding);
+		Img<IntType> imgOUT = segmentTreeLabeler.getLabelMap( hMin, thresh , peakFlooding, keepOrphanPeaks);
 		
 
-		
 		// format the output image
 		IntType minPixel = new IntType();
 		IntType maxPixel = new IntType();

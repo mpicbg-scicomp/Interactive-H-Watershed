@@ -110,6 +110,9 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="peak flooding (in %)", min="0", max="100")
 	private Float peakFlooding;
 	
+	@Parameter( label="keepOrphanPeaks", persist=false, required=false ) // with persist and required set to false the parameter become optional
+	private Boolean keepOrphanPeaks = true;
+	
 	@Parameter(style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "Image", "Contour overlay", "Solid overlay" } )
 	private String displayStyle = "Image";
 	
@@ -305,6 +308,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		changed.put("thresh", 			false);
 		changed.put("peakFlooding", 	false);
 		changed.put("displayOrient",	false);
+		changed.put("keepOrphanPeaks",	false);
+		
 		//System.out.println(displayOrientString + " : "+ displayOrient);
 		
 		//displayOrient = getDisplayOrient();
@@ -313,12 +318,12 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		previous.put("hMin", 			(double)getHMin());
 		previous.put("thresh", 			(double)getThresh());
 		previous.put("peakFlooding", 	(double)peakFlooding);
+		previous.put("keepOrphanPeaks", (double)getKeepOrphanPeaks());
 		
 		
 		
 		
-		segmentTreeLabeler.updateTreeLabeling( getHMin() );
-		Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, 2, 0);
+		Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap( getHMin(), getThresh(), peakFlooding, keepOrphanPeaks, 2, 0);
 		imp_curSeg = ImageJFunctions.wrapFloat(img_currentSegmentation, "treeCut");
 		
 		// create the window to show the segmentation display
@@ -346,7 +351,19 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		return val;
 	}
 	
+	private float getKeepOrphanPeaks() {
+		if( keepOrphanPeaks )
+			return 1f;
+		else
+			return 0f;
+	}
 	
+	private boolean toBoolean( double val ){
+		if ( val>0 )
+			return true;
+		else
+			return false;
+	}
 	
 	private int getDisplayOrient(){
 		
@@ -457,46 +474,17 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		
 		
 		
-		
-		
 		// update labelMap slice to visualize
-		if( changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get("displayOrient"))
+		if( changed.get("hMin") || changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get("keepOrphanPeaks") || changed.get("displayOrient"))
 		{
-			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
+			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap( getHMin(), getThresh(), peakFlooding, keepOrphanPeaks, displayOrient, pos[displayOrient]-1);
 			RandomAccessibleInterval<IntType> rai_currentSegmentation =  Views.dropSingletonDimensions(img_currentSegmentation);
+			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
 			
 			segDispRange[0] = 0;
-			segDispRange[1] = segmentTreeLabeler.getNumberOfLabels();
+			segDispRange[1] = segmentTreeLabeler.getNLabels();
 			
-			
-			long[] dimTest = new long[img_currentSegmentation.numDimensions()];
-			img_currentSegmentation.dimensions(dimTest);
-			//System.out.println("img_currentSegmentation "+ArrayUtils.toString( dimTest ) );
-			//System.out.println("slicing direction "+ displayOrient);
-			//System.out.println("pos[slicingDir] "+ pos[displayOrient]);
-			
-			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
 		}
-		else if( changed.get("hMin") )
-		{
-			//boolean makeNewLabels = true ; 
-			//int nLabels = segmentTreeLabeler.updateTreeLabeling( getHMin() , makeNewLabels );
-			segmentTreeLabeler.updateTreeLabeling( getHMin() );
-			
-			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
-			segDispRange[0] = 0;
-			segDispRange[1] = segmentTreeLabeler.getNumberOfLabels();
-			
-			RandomAccessibleInterval<IntType> rai_currentSegmentation =  Views.dropSingletonDimensions(img_currentSegmentation);
-			
-			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
-		}
-		
-		
-		//int[] dimsTest = imp_curSeg.getDimensions();
-		//System.out.println("imp_curSeg "+ArrayUtils.toString( dimsTest ) );
-		//System.out.println("slicing direction "+ displayOrient);
-		//System.out.println("pos[slicingDir] "+ pos[displayOrient]);
 		
 		render();	
 		
@@ -507,22 +495,6 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	
 	private boolean wasStateChanged(){
-		
-		// update the saved display parameter in case they were changed
-		/*
-		System.out.println( impSegmentationDisplay.toString() );
-		if( !impSegmentationDisplay.isVisible()){
-			impSegmentationDisplay.show();
-			System.out.println( "impSegmentationDisplay is not visible" );
-		}
-		if( impSegmentationDisplay.getWindow() == null){
-			System.out.println( "impSegmentationDisplay window is null" );
-			impSegmentationDisplay.flush();
-			impSegmentationDisplay=null;
-		}
-		else{
-			System.out.println("impSegmentationDisplay window :" + impSegmentationDisplay.getWindow().toString() );
-		}*/
 		
 		if( impSegmentationDisplay!=null ){
 			if (displayStyleOld.startsWith("Contour") | displayStyleOld.startsWith("Solid") ){
@@ -540,13 +512,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				System.out.println("update seg LUT: " + segLut.toString() + "  ;  range: " + Arrays.toString(segDispRange) );
 			}
 		}
-		else{
-			//System.out.println( "impSegmentationDisplay==null" );
-			//updateSegmentationDisplay();
-		}
 		
-		//update the list of image that can be overlaid by the segmentation
-		//updateImagesToDisplay();
 		
 		// reset all changed field to false
 		for(String key : changed.keySet() ){
@@ -571,6 +537,11 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		else if( (double)peakFlooding != previous.get("peakFlooding") ){
 			changed.put("peakFlooding",true);
 			previous.put( "peakFlooding" , (double)peakFlooding );
+			wasChanged  = true;
+		}
+		else if( keepOrphanPeaks != toBoolean(previous.get("keepOrphanPeaks")) ){
+			changed.put("keepOrphanPeaks",true);
+			previous.put( "keepOrphanPeaks" , (double)getKeepOrphanPeaks() );
 			wasChanged  = true;
 		}
 		else if( displayOrient != getDisplayOrient() ){
@@ -874,11 +845,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		double hMin = previous.get("hMin");
 		double thresh = previous.get("thresh");
 		double peakFlooding = previous.get("peakFlooding");
+		boolean keepOrphanPeaks = toBoolean( previous.get("keepOrphanPeaks") );
+		
+		
 		
 		//segmentTreeLabeler.updateTreeLabeling( (float)hMin , makeNewLabels);
-		segmentTreeLabeler.updateTreeLabeling( (float)hMin );
-		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)thresh , (float)peakFlooding);
-		int nLabels = segmentTreeLabeler.getNumberOfLabels();
+		//segmentTreeLabeler.updateTreeLabeling( (float)hMin );
+		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)hMin, (float)thresh , (float)peakFlooding, keepOrphanPeaks);
+		int nLabels = segmentTreeLabeler.getNLabels();
 		
 		if(  outputMask ) {
 			export_img = Utils.getPARegions( export_img );
