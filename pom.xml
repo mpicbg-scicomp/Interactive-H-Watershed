@@ -14,7 +14,7 @@
 
     <groupId>de.mpicbg.scf</groupId>
     <artifactId>InteractiveWatershed</artifactId>
-    <version>1.2.0-dev</version>
+    <version>1.2.1-dev</version>
 
     <name>InteractiveWatershed</name>
     <description>

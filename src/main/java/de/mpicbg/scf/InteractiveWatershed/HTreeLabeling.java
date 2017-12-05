@@ -6,6 +6,18 @@ import java.util.Queue;
 
 import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
 
+
+
+// TODO: When hMin is at the max value, threshold close to max value, some peaks with the max value in the image appear to have the same label (they should have distinct label) 
+
+// Note:
+//		* hMin is only use to split region, it should not act on selected region
+// 		* threshold acts on region shape without splitting them
+//		* peakFlooding can split object and change there shape 
+//		on the last 2 point i am not sure which approach is the best (threshold and peak flooding both split)
+//		or only one of them or none of them. should there be an option to switch between (splitting or not, currently keep orphan peaks
+//		but maybe in the future "allow threshold to split region")
+
 public class HTreeLabeling {
 	
 	boolean initialized = false;
@@ -27,7 +39,27 @@ public class HTreeLabeling {
 	{
 		this.dyn = tree.getFeature("dynamics");
 		this.Imax = tree.getFeature("Imax");
-
+		
+		
+		Queue<Node> Q = new LinkedList<Node>();
+		Q.addAll( tree.getRoots() );
+		double epsilon = 0.000000001;
+		while( ! Q.isEmpty() ) {
+			Node node = Q.poll();
+			if( ! Tree.isLeaf(node) ) {
+				final Node c0 = node.getChildren().get(0);
+				final Node c1 = node.getChildren().get(1);
+				final int c0Id = c0.getId();
+				final int c1Id = c1.getId();
+				if(Imax[c0Id]==Imax[c1Id]) {
+					Imax[c1Id] -= epsilon;
+					dyn[c1Id] -= epsilon;
+				}
+				Q.add(c0);
+				Q.add(c1);	
+			}
+		}
+		
 		this.nNodes = Imax.length;
 		this.Imin = new double[ nNodes ];
 		for( int i=0; i<nNodes; i++) {
@@ -46,22 +78,7 @@ public class HTreeLabeling {
 			}
 		}
 		
-		Queue<Node> Q = new LinkedList<Node>();
-		Q.addAll( tree.getRoots() );
-		double epsilon = 0.000000001;
-		while( ! Q.isEmpty() ) {
-			Node node = Q.poll();
-			if( ! Tree.isLeaf(node) ) {
-				final Node c0 = node.getChildren().get(0);
-				final Node c1 = node.getChildren().get(1);
-				final int c0Id = c0.getId();
-				final int c1Id = c1.getId();
-				if(Imax[c0Id]==Imax[c1Id])
-					Imax[c1Id] -= epsilon;
-				Q.add(c0);
-				Q.add(c1);	
-			}
-		}
+		
 		
 		
 		initialized = true;
@@ -99,19 +116,14 @@ public class HTreeLabeling {
 			final Node node = queue.poll();
 			final int nodeId = node.getId();
 			if( criteria[nodeId] <= hMin ) {
-				if( Imax[nodeId] >= threshold ) {
-					//currentLabel++;
-					//node.finalLabel = currentLabel; 
 					node.labelRoot = nodeId;
 					label++;
+					node.finalLabel = label; 
 					queueA.add(node);
-				}
-				else {
-					node.labelRoot = 0;
-				}
 			}
 			else {
 				node.labelRoot = 0;
+				node.finalLabel = 0;
 				for(Node childNode : node.getChildren() )
 					queue.add( childNode );
 			}
@@ -126,23 +138,36 @@ public class HTreeLabeling {
 			
 			int nodeId = node.getId();
 			double Imin_node = Imin[nodeId];
-			
 			double Imax_node = Imax[nodeId];
-			if ( threshold>Imax_node ) {
+			
+			if( node.labelRoot == 0 ) {
+				// do nothing
+			}
+			else if ( Imax_node < threshold  ) {
 				node.labelRoot = 0;
+				node.finalLabel = 0;
 			}
-			else if( threshold >= Imin_node) {
-				node.labelRoot = nodeId;
-				label++;
+			else if( threshold > Imin_node   &&  Imax[node.labelRoot]>Imax[nodeId]  ) {
+				if( keepOrphanPeak ){
+					node.labelRoot = nodeId;
+					label++;
+					node.finalLabel = label; 
+				}
+				else {
+					node.labelRoot = 0;
+					node.finalLabel = 0; 
+				}
 			}
-			else {
+			else if( threshold <= Imin_node){
 				if(thresholds[node.labelRoot] > Imin_node  && Imax[node.labelRoot]>Imax[nodeId]) {
 					if( keepOrphanPeak ){
 						node.labelRoot = nodeId;
 						label++;
+						node.finalLabel = label; 
 					}
 					else {
 						node.labelRoot = 0;
+						node.finalLabel = 0; 
 					}
 				}
 			}
@@ -151,13 +176,18 @@ public class HTreeLabeling {
 			for( Node child : node.getChildren() )
 			{
 				child.labelRoot = node.labelRoot;
+				child.finalLabel = node.finalLabel;
 				queueA.add(child);
 			}
 			
 		}
 		
 		
-		
+//		for( Node node : tree.getNodes().values() )
+//		{
+//			final int nodeId = node.getId();
+//			nodeIdToLabel[nodeId] = node.finalLabel;
+//		}
 		
 		// from the tree labeling determine label continuously filling the range [1, nLabel]
 		int currentLabel = 0;
