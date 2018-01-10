@@ -187,6 +187,7 @@ public class Tree {
 		boolean flag= false;
 		float decoration=0;
 		int labelRoot = 0;
+		public int finalLabel = 0;
 		
 		public float getDecoration() {
 			return decoration;

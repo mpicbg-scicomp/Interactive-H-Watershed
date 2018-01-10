@@ -85,6 +85,51 @@ public class TreeUtils {
 	}
 	
 	
+	
+	
+	
+	static public int[] getTreeLabeling_HMin_OrphanPeakHandling(Tree tree, double hMin, double threshold, double peakFlooding, boolean keepOrphanPeak ){
+		
+		peakFlooding = Math.max(0, peakFlooding);
+		peakFlooding = Math.min(100, peakFlooding);
+		peakFlooding = peakFlooding/100d;
+		
+		int[] nodeIdToLabel;
+		double[] dyn = tree.getFeature("dynamics");
+		double[] Imax = tree.getFeature("Imax");
+
+		int nNodes = Imax.length;
+		double[] Imin = new double[ nNodes ];
+		double[] thresholds = new double[ nNodes ];
+		
+		for( int i=0; i<nNodes; i++) {
+			Imin[i] = Imax[i]-dyn[i];
+			thresholds[i] = ( Imax[i]-threshold ) * ( 1-peakFlooding );
+		}
+		
+		
+		
+		for(Node node : tree.getNodes().values())
+		{
+			
+		}
+		
+		
+		LinkedList<Node> labelSeeds = getLabelRoots(tree, dyn , hMin );
+		
+		for(Node node : labelSeeds){
+			node.setDecoration( node.getId() );
+			node.labelRoot = node.getId();
+		}
+		
+		nodeIdToLabel = labelFromSeeds(tree, labelSeeds);
+		
+		
+		return nodeIdToLabel;
+	}
+	
+	
+	
 	/**
 	 * Helper function findings the most root node of each label 
 	 * i.e. right above the cut (and with not parent right above the cut value)
@@ -118,6 +163,7 @@ public class TreeUtils {
 			final Node node = Q_toExplore.poll();
 			
 			
+			// all leafs need to be labeled
 			List<Node> children = node.getChildren();
 			if ( children.size()==0 )
 			{
@@ -128,7 +174,7 @@ public class TreeUtils {
 			boolean allChildMeetCriteria=true;
 			for( Node child : children)
 			{
-				if ( !child.getFlag() )
+				if ( !child.getFlag() )  // true if child below the cut value
 				{
 					allChildMeetCriteria=false;
 					Q_toLabel.add(node);

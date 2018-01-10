@@ -102,13 +102,16 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	private String analyzedImageName = "test";
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Seed dynamics", stepSize="1.0")
-	private Float hMin_log;
+	private Float hMin_;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Intensity threshold", stepSize="1.0")
-	private Float thresh_log;
+	private Float thresh_;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="peak flooding (in %)", min="0", max="100")
 	private Float peakFlooding;
+	
+	@Parameter( label="AllowSplitting", persist=false, required=false ) // with persist and required set to false the parameter become optional
+	private Boolean allowSplitting = true;
 	
 	@Parameter(style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "Image", "Contour overlay", "Solid overlay" } )
 	private String displayStyle = "Image";
@@ -250,20 +253,20 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		AnalyzedImageItem.setValue(this, imp0.getTitle() );
 		
 		// initialize seed threshold (jMin) slider attributes ////////////////////// 
-		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("hMin_log", Float.class);
+		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("hMin_", Float.class);
 		thresholdItem.setMinimumValue( new Float(0) );
-		thresholdItem.setMaximumValue( new Float( sliderNStep ));
+		thresholdItem.setMaximumValue( new Float( maxDyn ));
 		//thresholdItem.setStepSize( 0.05);
-		hMin_log = 0f;
-		thresholdItem.setValue(this, hMin_log);
+		hMin_ = 0f;
+		thresholdItem.setValue(this, hMin_);
 		
 		// initialize intensity threshold slider attributes ////////////////////////////
-		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("thresh_log", Float.class);
-		thresholdItem2.setMinimumValue( new Float(0) );
-		thresholdItem2.setMaximumValue( new Float( sliderNStep ));
+		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("thresh_", Float.class);
+		thresholdItem2.setMinimumValue( new Float(minI) );
+		thresholdItem2.setMaximumValue( new Float( maxI ));
 		//thresholdItem2.setStepSize( 0.05);
-		thresh_log = 0f;
-		thresholdItem2.setValue(this, thresh_log);
+		thresh_ = minI;
+		thresholdItem2.setValue(this, thresh_);
 		
 		// initialize peak flooding (%) slider attributes ////////////////////////////
 		final MutableModuleItem<Float> thresholdItem3 = getInfo().getMutableInput("peakFlooding", Float.class);
@@ -305,6 +308,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		changed.put("thresh", 			false);
 		changed.put("peakFlooding", 	false);
 		changed.put("displayOrient",	false);
+		changed.put("allowSplitting",	false);
+		
 		//System.out.println(displayOrientString + " : "+ displayOrient);
 		
 		//displayOrient = getDisplayOrient();
@@ -313,12 +318,12 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		previous.put("hMin", 			(double)getHMin());
 		previous.put("thresh", 			(double)getThresh());
 		previous.put("peakFlooding", 	(double)peakFlooding);
+		previous.put("allowSplitting", (double)getallowSplitting());
 		
 		
 		
 		
-		segmentTreeLabeler.updateTreeLabeling( getHMin() );
-		Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, 2, 0);
+		Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap( getHMin(), getThresh(), peakFlooding, allowSplitting, 2, 0);
 		imp_curSeg = ImageJFunctions.wrapFloat(img_currentSegmentation, "treeCut");
 		
 		// create the window to show the segmentation display
@@ -332,21 +337,34 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	
 	private float getHMin(){
-		float val = (float)Math.exp(hMin_log * stepSize )+minDyn-1;
-		System.out.println("hmin="+val);
+		//float val = (float)Math.exp(hMin_log * stepSize )+minDyn-1;
+		//System.out.println("hmin="+val);
+		float val = hMin_;
 		return val;
 	}
 	
 	
 	
 	private float getThresh(){
-		float val = (float)Math.exp(thresh_log * stepSize )+minI-1;
-		System.out.println("thresh="+val);
-
+		//float val = (float)Math.exp(thresh_log * stepSize )+minI-1;
+		//System.out.println("thresh="+val);
+		float val = thresh_;
 		return val;
 	}
 	
+	private float getallowSplitting() {
+		if( allowSplitting )
+			return 1f;
+		else
+			return 0f;
+	}
 	
+	private boolean toBoolean( double val ){
+		if ( val>0 )
+			return true;
+		else
+			return false;
+	}
 	
 	private int getDisplayOrient(){
 		
@@ -457,46 +475,17 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		
 		
 		
-		
-		
 		// update labelMap slice to visualize
-		if( changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get("displayOrient"))
+		if( changed.get("hMin") || changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get("allowSplitting") || changed.get("displayOrient"))
 		{
-			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
+			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap( getHMin(), getThresh(), peakFlooding, allowSplitting, displayOrient, pos[displayOrient]-1);
 			RandomAccessibleInterval<IntType> rai_currentSegmentation =  Views.dropSingletonDimensions(img_currentSegmentation);
+			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
 			
 			segDispRange[0] = 0;
-			segDispRange[1] = segmentTreeLabeler.getNumberOfLabels();
+			segDispRange[1] = segmentTreeLabeler.getNLabels();
 			
-			
-			long[] dimTest = new long[img_currentSegmentation.numDimensions()];
-			img_currentSegmentation.dimensions(dimTest);
-			//System.out.println("img_currentSegmentation "+ArrayUtils.toString( dimTest ) );
-			//System.out.println("slicing direction "+ displayOrient);
-			//System.out.println("pos[slicingDir] "+ pos[displayOrient]);
-			
-			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
 		}
-		else if( changed.get("hMin") )
-		{
-			//boolean makeNewLabels = true ; 
-			//int nLabels = segmentTreeLabeler.updateTreeLabeling( getHMin() , makeNewLabels );
-			segmentTreeLabeler.updateTreeLabeling( getHMin() );
-			
-			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap(getThresh(), peakFlooding, displayOrient, pos[displayOrient]-1);
-			segDispRange[0] = 0;
-			segDispRange[1] = segmentTreeLabeler.getNumberOfLabels();
-			
-			RandomAccessibleInterval<IntType> rai_currentSegmentation =  Views.dropSingletonDimensions(img_currentSegmentation);
-			
-			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
-		}
-		
-		
-		//int[] dimsTest = imp_curSeg.getDimensions();
-		//System.out.println("imp_curSeg "+ArrayUtils.toString( dimsTest ) );
-		//System.out.println("slicing direction "+ displayOrient);
-		//System.out.println("pos[slicingDir] "+ pos[displayOrient]);
 		
 		render();	
 		
@@ -507,22 +496,6 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	
 	private boolean wasStateChanged(){
-		
-		// update the saved display parameter in case they were changed
-		/*
-		System.out.println( impSegmentationDisplay.toString() );
-		if( !impSegmentationDisplay.isVisible()){
-			impSegmentationDisplay.show();
-			System.out.println( "impSegmentationDisplay is not visible" );
-		}
-		if( impSegmentationDisplay.getWindow() == null){
-			System.out.println( "impSegmentationDisplay window is null" );
-			impSegmentationDisplay.flush();
-			impSegmentationDisplay=null;
-		}
-		else{
-			System.out.println("impSegmentationDisplay window :" + impSegmentationDisplay.getWindow().toString() );
-		}*/
 		
 		if( impSegmentationDisplay!=null ){
 			if (displayStyleOld.startsWith("Contour") | displayStyleOld.startsWith("Solid") ){
@@ -540,13 +513,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 				System.out.println("update seg LUT: " + segLut.toString() + "  ;  range: " + Arrays.toString(segDispRange) );
 			}
 		}
-		else{
-			//System.out.println( "impSegmentationDisplay==null" );
-			//updateSegmentationDisplay();
-		}
 		
-		//update the list of image that can be overlaid by the segmentation
-		//updateImagesToDisplay();
 		
 		// reset all changed field to false
 		for(String key : changed.keySet() ){
@@ -571,6 +538,11 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		else if( (double)peakFlooding != previous.get("peakFlooding") ){
 			changed.put("peakFlooding",true);
 			previous.put( "peakFlooding" , (double)peakFlooding );
+			wasChanged  = true;
+		}
+		else if( allowSplitting != toBoolean(previous.get("allowSplitting")) ){
+			changed.put("allowSplitting",true);
+			previous.put( "allowSplitting" , (double)getallowSplitting() );
 			wasChanged  = true;
 		}
 		else if( displayOrient != getDisplayOrient() ){
@@ -874,11 +846,14 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		double hMin = previous.get("hMin");
 		double thresh = previous.get("thresh");
 		double peakFlooding = previous.get("peakFlooding");
+		boolean allowSplitting = toBoolean( previous.get("allowSplitting") );
+		
+		
 		
 		//segmentTreeLabeler.updateTreeLabeling( (float)hMin , makeNewLabels);
-		segmentTreeLabeler.updateTreeLabeling( (float)hMin );
-		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)thresh , (float)peakFlooding);
-		int nLabels = segmentTreeLabeler.getNumberOfLabels();
+		//segmentTreeLabeler.updateTreeLabeling( (float)hMin );
+		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)hMin, (float)thresh , (float)peakFlooding, allowSplitting);
+		int nLabels = segmentTreeLabeler.getNLabels();
 		
 		if(  outputMask ) {
 			export_img = Utils.getPARegions( export_img );
@@ -919,13 +894,13 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		Recorder recorder =  Recorder.getInstance();  
 		if( recorder != null ){
 			if( !Recorder.scriptMode() ){
-				Recorder.record("run","H_Watershed", "impin=[" + imp0.getTitle() + "] hmin=" + hMin + " thresh=" + thresh + " peakflooding=" + peakFlooding+" outputmask="+outputMask);
+				Recorder.record("run","H_Watershed", "impin=[" + imp0.getTitle() + "] hmin=" + hMin + " thresh=" + thresh + " peakflooding=" + peakFlooding+" outputmask="+outputMask + " allowsplitting="+allowSplitting );
 			}
 			else{
 				Recorder.recordCall("# @ImagePlus impIN");
 				Recorder.recordCall("# @OpService ops");
 				Recorder.recordCall("# @OUTPUT ImagePlus impOUT");
-				Recorder.recordCall("impOUT = ops.run(\"H_Watershed\", impIN, "+hMin+", "+thresh+", "+peakFlooding + ", " + outputMask + ")" );
+				Recorder.recordCall("impOUT = ops.run(\"H_Watershed\", impIN, "+hMin+", "+thresh+", "+peakFlooding + ", " + outputMask + ", " + allowSplitting + ")" );
 			}
 		}
 		

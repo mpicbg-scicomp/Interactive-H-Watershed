@@ -26,7 +26,6 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 */
 
 
-import java.util.Arrays;
 
 import net.imglib2.Cursor;
 import net.imglib2.IterableInterval;
@@ -51,12 +50,16 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 	Img<IntType> segmentMap0;
 	Img<T> intensity0;
 	
-	int[] nodeIdToLabel;  	// current tree labelling
+	HTreeLabeling treeLabeler;
+	
 	int nLabels; 			// the number of the label in the label map for the current H (defines the tree labeling) and Threshold
 	
 	
 	Img<IntType> segmentMap; // current hyperslice
 	IterableInterval<T> intensity; // current hyperslice
+	
+	
+	
 	
 	/**
 	 * 
@@ -70,37 +73,13 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 		this.segmentMap0 = segmentMap0;
 		this.intensity0 = intensity0;
 		
+		treeLabeler = new HTreeLabeling(segmentTree);
+		
 	}
 	
-	/**
-	 * @param hMin the minimum  dynamics of a peak not to be merged
-	 */
-	public void updateTreeLabeling(float hMin ){
-		boolean makeNewLabels = false;
-		nodeIdToLabel =  TreeUtils.getTreeLabeling(segmentTree0, "dynamics", hMin, makeNewLabels );
-		//return getNumberOfLabels();
-	}
 
-	//public int updateTreeLabeling(float hMin, boolean makeNewLabels ){
-	//	nodeIdToLabel =  TreeUtils.getTreeLabeling(segmentTree0, "dynamics", hMin, makeNewLabels );
-	//	return getNumberOfLabels();
-	//}
-	
-	
-	/**
-	 * 
-	 * @return the number of label in the current tree labeling
-	 */
-	public int getNumberOfLabels(){
-		
+	public int getNLabels() {
 		return nLabels;
-		
-		//Set<Integer> labelSet = new HashSet<Integer>();
-		//if( nodeIdToLabel != null )
-		//	for( int val : nodeIdToLabel)
-		//		if( val>0)
-		//			labelSet.add(val);
-		//return labelSet.size();
 	}
 	
 	
@@ -110,7 +89,7 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 	 * @param percentFlooding , percent of the peak that will be flooded  (percent between label maximum and the threshold) 
 	 * @return a label image corresponding to the current tree labeling, threshold, percentFlooding parameters
 	 */
-	public Img<IntType> getLabelMap( float threshold, float percentFlooding){
+	public Img<IntType> getLabelMap( float hMin, float threshold, float percentFlooding, boolean keepOrphanPeak){
 		
 		intensity = (IterableInterval<T>) intensity0;
 		
@@ -125,7 +104,7 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 		}
 		
 		
-		Img<IntType> labelMap = fillLabelMap(threshold, percentFlooding);
+		Img<IntType> labelMap = fillLabelMap2(hMin, threshold, percentFlooding, keepOrphanPeak);
 		
 		return labelMap;
 	}
@@ -140,7 +119,7 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 	 * @param pos , position of the slice on long the dimension
 	 * @return a label map
 	 */
-	public Img<IntType> getLabelMap( float threshold, float percentFlooding, int dim, long pos){
+	public Img<IntType> getLabelMap( float hMin, float threshold, float percentFlooding, boolean keepOrphanPeak, int dim, long pos){
 		
 		int nDims = segmentMap0.numDimensions();
 		
@@ -180,61 +159,22 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 			intensity = (IterableInterval<T>) intensity0;
 		}
 		
-		Img<IntType> labelMap = fillLabelMap( threshold, percentFlooding);
+		Img<IntType> labelMap = fillLabelMap2( hMin, threshold, percentFlooding, keepOrphanPeak);
 		
 		return labelMap;
 	}
 	
 	
 	
-	
-	protected Img<IntType> fillLabelMap( float threshold, float percentFlooding ){
+	protected Img<IntType> fillLabelMap2( float hMin, float threshold, float percentFlooding, boolean keepOrphanPeak ){
 		
 		
-		
-		double[] Imax = segmentTree0.getFeature("Imax");
-		double minI = Imax[0]; // Imax is set to min of the image for the node 0  (it represents the background)
-		// create a new (continuous) labeling where only the region visible in the current labeling (and threshold) are numbered
 		int nNodes = segmentTree0.getNumNodes();
-		int[] nodeIdToLabel2 = new int[nNodes];
-		int[] labelled = new int[nNodes];
-		int currentLabel = 0;
-		for(int i=0; i<nNodes ; i++)
-		{
-			int parent = nodeIdToLabel[i];
-			double ImaxParent = Imax[parent]; 
-			if( ImaxParent >= threshold && ImaxParent>minI )
-			{
-				int parentLabel = labelled[parent];
-				if( parentLabel > 0 ) // parent is already labelled, label the node according to its parent
-				{
-					nodeIdToLabel2[i] = parentLabel;
-				}
-				else // parent is not labeled yet, create a new label
-				{
-					currentLabel++;
-					labelled[parent] = currentLabel;
-					nodeIdToLabel2[i] = currentLabel;
-				}
-			}
-			// else do nothing since the nodeIdToLabel2 is initialized to 0 
-		}
-		this.nLabels = currentLabel;
+		int[] nodeIdToLabel = new int[nNodes];
+		int[] nodeIdToLabelRoot = new int[nNodes];
+		double[] peakThresholds = new double[nNodes];
 		
-		
-		int nNode = Imax.length;
-		float[] peakThresholds = new float[nNode];
-		for(int i=0;i<nNode; i++)
-			peakThresholds[i] =  threshold + ((float)Imax[i]-threshold)*(1f-percentFlooding/100f);
-		
-		//System.out.println("lookup node to label: " + Arrays.toString(nodeIdToLabel) );
-		//System.out.println("lookup node to label2: " + Arrays.toString(nodeIdToLabel2) );
-		//System.out.println("lookup node to Imax: " + Arrays.toString(Imax) );
-		//double[] dynamics = segmentTree0.getFeature("dynamics");
-		//System.out.println("lookup node to dyn: " + Arrays.toString(dynamics) );
-		//System.out.println("lookup node to thresh: " + Arrays.toString(peakThresholds) );
-		
-		
+		this.nLabels = treeLabeler.getLabeling(hMin, threshold, percentFlooding, keepOrphanPeak, nodeIdToLabel, nodeIdToLabelRoot, peakThresholds);
 		
 		Cursor<IntType> cursor = segmentMap.cursor();
 		Cursor<T> cursorImg = intensity.cursor();
@@ -246,13 +186,12 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 			IntType pixel = cursor.next();
 			if(  val >= threshold )
 			{
-				int node = (int)pixel.getRealFloat();
-				int labelRoot = segmentTree0.nodes.get(node).labelRoot;
+				final int nodeId = (int)pixel.getRealFloat();
+				final int labelRoot = nodeIdToLabelRoot[nodeId];
 				if(  val >= peakThresholds[labelRoot]  )
 				{	
-					int label = nodeIdToLabel2[node];
-					float finalVal = (float)label;
-					pixel.setReal( finalVal );
+					final int label = nodeIdToLabel[nodeId];
+					pixel.setReal( (float)label );
 				}
 				else
 					pixel.setReal( 0.0 );
@@ -263,4 +202,6 @@ public class SegmentHierarchyToLabelMap <T extends RealType<T>> {
 		return segmentMap;
 		
 	}
+	
+	
 }
