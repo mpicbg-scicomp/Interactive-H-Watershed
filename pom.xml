@@ -8,13 +8,13 @@
     <parent>
         <groupId>org.scijava</groupId>
         <artifactId>pom-scijava</artifactId>
-        <version>17.1.1</version>
+        <version>19.0.0</version>
         <relativePath/>
     </parent>
 
     <groupId>de.mpicbg.scf</groupId>
     <artifactId>InteractiveWatershed</artifactId>
-    <version>1.2.1-dev</version>
+    <version>1.2.1</version>
 
     <name>InteractiveWatershed</name>
     <description>
