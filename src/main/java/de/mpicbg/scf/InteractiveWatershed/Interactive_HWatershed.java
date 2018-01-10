@@ -110,8 +110,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="peak flooding (in %)", min="0", max="100")
 	private Float peakFlooding;
 	
-	@Parameter( label="keepOrphanPeaks", persist=false, required=false ) // with persist and required set to false the parameter become optional
-	private Boolean keepOrphanPeaks = true;
+	@Parameter( label="AllowSplitting", persist=false, required=false ) // with persist and required set to false the parameter become optional
+	private Boolean allowSplitting = true;
 	
 	@Parameter(style = ChoiceWidget.RADIO_BUTTON_HORIZONTAL_STYLE, choices = { "Image", "Contour overlay", "Solid overlay" } )
 	private String displayStyle = "Image";
@@ -308,7 +308,7 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		changed.put("thresh", 			false);
 		changed.put("peakFlooding", 	false);
 		changed.put("displayOrient",	false);
-		changed.put("keepOrphanPeaks",	false);
+		changed.put("allowSplitting",	false);
 		
 		//System.out.println(displayOrientString + " : "+ displayOrient);
 		
@@ -318,12 +318,12 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		previous.put("hMin", 			(double)getHMin());
 		previous.put("thresh", 			(double)getThresh());
 		previous.put("peakFlooding", 	(double)peakFlooding);
-		previous.put("keepOrphanPeaks", (double)getKeepOrphanPeaks());
+		previous.put("allowSplitting", (double)getallowSplitting());
 		
 		
 		
 		
-		Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap( getHMin(), getThresh(), peakFlooding, keepOrphanPeaks, 2, 0);
+		Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap( getHMin(), getThresh(), peakFlooding, allowSplitting, 2, 0);
 		imp_curSeg = ImageJFunctions.wrapFloat(img_currentSegmentation, "treeCut");
 		
 		// create the window to show the segmentation display
@@ -351,8 +351,8 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		return val;
 	}
 	
-	private float getKeepOrphanPeaks() {
-		if( keepOrphanPeaks )
+	private float getallowSplitting() {
+		if( allowSplitting )
 			return 1f;
 		else
 			return 0f;
@@ -475,9 +475,9 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		
 		
 		// update labelMap slice to visualize
-		if( changed.get("hMin") || changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get("keepOrphanPeaks") || changed.get("displayOrient"))
+		if( changed.get("hMin") || changed.get("thresh") || changed.get("pos") || changed.get("peakFlooding") || changed.get("allowSplitting") || changed.get("displayOrient"))
 		{
-			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap( getHMin(), getThresh(), peakFlooding, keepOrphanPeaks, displayOrient, pos[displayOrient]-1);
+			Img<IntType> img_currentSegmentation = segmentTreeLabeler.getLabelMap( getHMin(), getThresh(), peakFlooding, allowSplitting, displayOrient, pos[displayOrient]-1);
 			RandomAccessibleInterval<IntType> rai_currentSegmentation =  Views.dropSingletonDimensions(img_currentSegmentation);
 			imp_curSeg = ImageJFunctions.wrapFloat(rai_currentSegmentation, "treeCut");
 			
@@ -539,9 +539,9 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 			previous.put( "peakFlooding" , (double)peakFlooding );
 			wasChanged  = true;
 		}
-		else if( keepOrphanPeaks != toBoolean(previous.get("keepOrphanPeaks")) ){
-			changed.put("keepOrphanPeaks",true);
-			previous.put( "keepOrphanPeaks" , (double)getKeepOrphanPeaks() );
+		else if( allowSplitting != toBoolean(previous.get("allowSplitting")) ){
+			changed.put("allowSplitting",true);
+			previous.put( "allowSplitting" , (double)getallowSplitting() );
 			wasChanged  = true;
 		}
 		else if( displayOrient != getDisplayOrient() ){
@@ -845,13 +845,13 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		double hMin = previous.get("hMin");
 		double thresh = previous.get("thresh");
 		double peakFlooding = previous.get("peakFlooding");
-		boolean keepOrphanPeaks = toBoolean( previous.get("keepOrphanPeaks") );
+		boolean allowSplitting = toBoolean( previous.get("allowSplitting") );
 		
 		
 		
 		//segmentTreeLabeler.updateTreeLabeling( (float)hMin , makeNewLabels);
 		//segmentTreeLabeler.updateTreeLabeling( (float)hMin );
-		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)hMin, (float)thresh , (float)peakFlooding, keepOrphanPeaks);
+		Img<IntType> export_img = segmentTreeLabeler.getLabelMap( (float)hMin, (float)thresh , (float)peakFlooding, allowSplitting);
 		int nLabels = segmentTreeLabeler.getNLabels();
 		
 		if(  outputMask ) {
@@ -893,13 +893,13 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		Recorder recorder =  Recorder.getInstance();  
 		if( recorder != null ){
 			if( !Recorder.scriptMode() ){
-				Recorder.record("run","H_Watershed", "impin=[" + imp0.getTitle() + "] hmin=" + hMin + " thresh=" + thresh + " peakflooding=" + peakFlooding+" outputmask="+outputMask);
+				Recorder.record("run","H_Watershed", "impin=[" + imp0.getTitle() + "] hmin=" + hMin + " thresh=" + thresh + " peakflooding=" + peakFlooding+" outputmask="+outputMask + " allowsplitting="+allowSplitting );
 			}
 			else{
 				Recorder.recordCall("# @ImagePlus impIN");
 				Recorder.recordCall("# @OpService ops");
 				Recorder.recordCall("# @OUTPUT ImagePlus impOUT");
-				Recorder.recordCall("impOUT = ops.run(\"H_Watershed\", impIN, "+hMin+", "+thresh+", "+peakFlooding + ", " + outputMask + ")" );
+				Recorder.recordCall("impOUT = ops.run(\"H_Watershed\", impIN, "+hMin+", "+thresh+", "+peakFlooding + ", " + outputMask + ", " + allowSplitting + ")" );
 			}
 		}
 		

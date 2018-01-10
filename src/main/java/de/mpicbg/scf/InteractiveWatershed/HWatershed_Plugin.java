@@ -81,12 +81,11 @@ public class HWatershed_Plugin extends AbstractOp  {
 	@Parameter( label="peak flooding (in %)", persist=false, required=false ) // with persist and required set to false the parameter become optional
 	private Float peakFlooding = 100f;
 	
-	@Parameter( label="keepOrphanPeaks", persist=false, required=false ) // with persist and required set to false the parameter become optional
-	private Boolean keepOrphanPeaks = true;
-	
 	@Parameter(label = "export regions mask", persist = false, required=false , description="if checked the output will be compatible with the particle analyzer") // persist is important otherwise it keep the value used previously independant what is set manually
 	private Boolean outputMask = false;
 	
+	@Parameter( label="Allow splitting", persist=false, required=false ) // with persist and required set to false the parameter become optional
+	private Boolean allowSplitting = true;
 	
 	
 	
@@ -136,7 +135,7 @@ public class HWatershed_Plugin extends AbstractOp  {
 		// segment tree to label map  
 		Img<IntType> hSegmentMap = segmentTreeConstructor.getLabelMapMaxTree();
 		SegmentHierarchyToLabelMap<FloatType> segmentTreeLabeler = new SegmentHierarchyToLabelMap<FloatType>( hSegmentTree, hSegmentMap, imgIN );
-		Img<IntType> imgOUT = segmentTreeLabeler.getLabelMap( hMin, thresh , peakFlooding, keepOrphanPeaks);
+		Img<IntType> imgOUT = segmentTreeLabeler.getLabelMap( hMin, thresh , peakFlooding, allowSplitting);
 		
 
 		// format the output image
