@@ -102,10 +102,10 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	private String analyzedImageName = "test";
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Seed dynamics", stepSize="1.0")
-	private Float hMin_log;
+	private Float hMin_;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="Intensity threshold", stepSize="1.0")
-	private Float thresh_log;
+	private Float thresh_;
 	
 	@Parameter(style = NumberWidget.SCROLL_BAR_STYLE, persist = false, label="peak flooding (in %)", min="0", max="100")
 	private Float peakFlooding;
@@ -253,20 +253,20 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 		AnalyzedImageItem.setValue(this, imp0.getTitle() );
 		
 		// initialize seed threshold (jMin) slider attributes ////////////////////// 
-		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("hMin_log", Float.class);
+		final MutableModuleItem<Float> thresholdItem = getInfo().getMutableInput("hMin_", Float.class);
 		thresholdItem.setMinimumValue( new Float(0) );
-		thresholdItem.setMaximumValue( new Float( sliderNStep ));
+		thresholdItem.setMaximumValue( new Float( maxDyn ));
 		//thresholdItem.setStepSize( 0.05);
-		hMin_log = 0f;
-		thresholdItem.setValue(this, hMin_log);
+		hMin_ = 0f;
+		thresholdItem.setValue(this, hMin_);
 		
 		// initialize intensity threshold slider attributes ////////////////////////////
-		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("thresh_log", Float.class);
-		thresholdItem2.setMinimumValue( new Float(0) );
-		thresholdItem2.setMaximumValue( new Float( sliderNStep ));
+		final MutableModuleItem<Float> thresholdItem2 = getInfo().getMutableInput("thresh_", Float.class);
+		thresholdItem2.setMinimumValue( new Float(minI) );
+		thresholdItem2.setMaximumValue( new Float( maxI ));
 		//thresholdItem2.setStepSize( 0.05);
-		thresh_log = 0f;
-		thresholdItem2.setValue(this, thresh_log);
+		thresh_ = minI;
+		thresholdItem2.setValue(this, thresh_);
 		
 		// initialize peak flooding (%) slider attributes ////////////////////////////
 		final MutableModuleItem<Float> thresholdItem3 = getInfo().getMutableInput("peakFlooding", Float.class);
@@ -337,17 +337,18 @@ public class Interactive_HWatershed extends InteractiveCommand implements Previe
 	
 	
 	private float getHMin(){
-		float val = (float)Math.exp(hMin_log * stepSize )+minDyn-1;
-		System.out.println("hmin="+val);
+		//float val = (float)Math.exp(hMin_log * stepSize )+minDyn-1;
+		//System.out.println("hmin="+val);
+		float val = hMin_;
 		return val;
 	}
 	
 	
 	
 	private float getThresh(){
-		float val = (float)Math.exp(thresh_log * stepSize )+minI-1;
-		System.out.println("thresh="+val);
-
+		//float val = (float)Math.exp(thresh_log * stepSize )+minI-1;
+		//System.out.println("thresh="+val);
+		float val = thresh_;
 		return val;
 	}
 	
