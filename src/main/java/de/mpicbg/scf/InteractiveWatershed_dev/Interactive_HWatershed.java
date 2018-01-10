@@ -1,4 +1,4 @@
-package de.mpicbg.scf.InteractiveWatershed;
+package de.mpicbg.scf.InteractiveWatershed_dev;
 
 
 /*
@@ -78,11 +78,12 @@ import org.scijava.plugin.Plugin;
 import org.scijava.widget.Button;
 import org.scijava.widget.ChoiceWidget;
 import org.scijava.widget.NumberWidget;
+
+import de.mpicbg.scf.InteractiveWatershed_dev.HWatershedLabeling.Connectivity;
+
 import org.scijava.module.MutableModuleItem;
 import org.scijava.ItemIO;
 import org.scijava.ItemVisibility;
-
-import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
 
 
 /**
@@ -91,7 +92,7 @@ import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
  * known issue: the input harvester cannot be refreshed : view image list is not updated
  * 
  */
-@Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive H_Watershed", initializer="initialize_HWatershed", headless = true, label="Interactive H_Watershed")
+@Plugin(type = Command.class, menuPath = "SCF>Labeling>Interactive H_Watershed_dev", initializer="initialize_HWatershed", headless = true, label="Interactive H_Watershed_dev")
 public class Interactive_HWatershed extends InteractiveCommand implements Previewable, MouseMotionListener {
 
 	// -- Parameters --

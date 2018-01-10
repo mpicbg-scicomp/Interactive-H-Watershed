@@ -1,4 +1,4 @@
-package de.mpicbg.scf.InteractiveWatershed.imgTools;
+package de.mpicbg.scf.InteractiveWatershed_dev.imgTools;
 
 /*
 Author: Robert Haase, Scientific Computing Facility, MPI-CBG, Dresden  

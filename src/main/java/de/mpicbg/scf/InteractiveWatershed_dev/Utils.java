@@ -1,4 +1,6 @@
-package de.mpicbg.scf.InteractiveWatershed;
+package de.mpicbg.scf.InteractiveWatershed_dev;
+
+import de.mpicbg.scf.InteractiveWatershed_dev.imgTools.ImageConnectivity;
 
 /*
 Author: Benoit Lombardot, Scientific Computing Facility, MPI-CBG, Dresden  
@@ -45,8 +47,6 @@ import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.util.Intervals;
 import net.imglib2.util.Util;
 import net.imglib2.view.Views;
-
-import de.mpicbg.scf.InteractiveWatershed.imgTools.ImageConnectivity;
 
 
 public class Utils {

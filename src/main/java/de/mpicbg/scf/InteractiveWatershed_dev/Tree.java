@@ -1,4 +1,4 @@
-package de.mpicbg.scf.InteractiveWatershed;
+package de.mpicbg.scf.InteractiveWatershed_dev;
 
 
 /*
@@ -179,7 +179,7 @@ public class Tree {
 	}
 	
 	
-	protected class Node
+	public class Node
 	{
 		Integer id;
 		Node parent;

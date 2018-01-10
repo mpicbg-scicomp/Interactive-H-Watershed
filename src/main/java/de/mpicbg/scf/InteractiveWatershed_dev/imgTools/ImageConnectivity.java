@@ -1,4 +1,4 @@
-package de.mpicbg.scf.InteractiveWatershed.imgTools;
+package de.mpicbg.scf.InteractiveWatershed_dev.imgTools;
 
 /*
 Author: Benoit Lombardot, Scientific Computing Facility, MPI-CBG, Dresden  

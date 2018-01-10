@@ -1,4 +1,4 @@
-package de.mpicbg.scf.InteractiveWatershed;
+package de.mpicbg.scf.InteractiveWatershed_dev;
 
 
 /*
@@ -28,7 +28,8 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 
 import java.util.LinkedList;
 import java.util.List;
-import de.mpicbg.scf.InteractiveWatershed.Tree.Node;
+
+import de.mpicbg.scf.InteractiveWatershed_dev.Tree.Node;
 
 public class TreeUtils {
 

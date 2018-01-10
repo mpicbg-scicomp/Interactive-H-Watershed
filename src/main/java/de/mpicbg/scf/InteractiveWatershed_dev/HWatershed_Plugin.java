@@ -1,4 +1,4 @@
-package de.mpicbg.scf.InteractiveWatershed;
+package de.mpicbg.scf.InteractiveWatershed_dev;
 
 
 /*
@@ -56,12 +56,12 @@ import org.scijava.ItemIO;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
-import de.mpicbg.scf.InteractiveWatershed.HWatershedLabeling.Connectivity;
+import de.mpicbg.scf.InteractiveWatershed_dev.HWatershedLabeling.Connectivity;
 
 
 
 
-@Plugin(type = Op.class, name="H_Watershed", headless = true, label="H_Watershed", visible=true, menuPath = "SCF>Labeling>H_Watershed") // if menu is not set, the plugin won't appear in imagej's menu and won't be callable in macro
+@Plugin(type = Op.class, name="H_Watershed_dev", headless = true, label="H_Watershed_dev", visible=true, menuPath = "SCF>Labeling>H_Watershed_dev") // if menu is not set, the plugin won't appear in imagej's menu and won't be callable in macro
 public class HWatershed_Plugin extends AbstractOp  {
 
 	
