@@ -179,7 +179,7 @@ public class Tree {
 	}
 	
 	
-	protected class Node
+	public class Node
 	{
 		Integer id;
 		Node parent;
