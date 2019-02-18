@@ -20,7 +20,7 @@
     <description>
         InteractiveWatershed
     </description>
-    <url>http://imagej.net/Interactive_Watershed</url>
+    <url>https://imagej.net/Interactive_Watershed</url>
     <inceptionYear>2017</inceptionYear>
     <organization>
         <name>MPI CBG</name>
@@ -38,7 +38,7 @@
             <name>Benoit Lombardot</name>
             <email>lombardo@mpi-cbg.de</email>
             <organization>Scientific Computing Facility, MPI CBG Dresden</organization>
-            <url>http://imagej.net/User:Benoit</url>
+            <url>https://imagej.net/User:Benoit</url>
             <roles>
 				<role>founder</role>
 				<role>developer</role>
@@ -80,7 +80,7 @@
     <repositories>
         <repository>
             <id>imagej.public</id>
-            <url>http://maven.imagej.net/content/groups/public</url>
+            <url>https://maven.imagej.net/content/groups/public</url>
         </repository>
     </repositories>
 
